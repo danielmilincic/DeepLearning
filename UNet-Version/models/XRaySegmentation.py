@@ -8,31 +8,27 @@ import numpy as np
 from cv2 import imread
 from sklearn.model_selection import train_test_split
 
+# model = UNet_3Plus.UNet_3Plus_DeepSup()
 
- # model = UNet_3Plus.UNet_3Plus_DeepSup()
-path_to_data="data/"
-path_to_label="labels/"
-data = []
-labels = []
-
-
-path_to_data = os.listdir(path_to_data)
-tiff_data_files = [file for file in path_to_data]
-tiff_data_files.sort()
-
-path_to_label = os.listdir(path_to_label)
-tiff_label_files = [file for file in path_to_label]
-tiff_label_files.sort()
+"""
+Transform the images of the original and labeled data into arrays.
+Split the data into training and test sets.
+"""
 
 
+def load_images_from_directory(directory):
+    images = []
+    image_files = sorted(os.listdir(directory))
+
+    for image_file in image_files:
+        image = cv2.imread(os.path.join(directory, image_file), cv2.IMREAD_UNCHANGED)
+        images.append(image)
+    return images
 
 
-for data_file, label_file in zip(tiff_data_files, tiff_label_files):
-    data_image = imread("data/" + data_file, cv2.IMREAD_UNCHANGED)
-    data.append(data_image)
-    label_image = imread("labels/" + label_file, cv2.IMREAD_UNCHANGED)
-    labels.append(label_image)
+data_directory = "data/"
+label_directory = "labels/"
+data = load_images_from_directory(data_directory)
+labels = load_images_from_directory(label_directory)
 
-
-train_images, test_images, train_labels, test_labels = train_test_split(data, labels,test_size=0.2,random_state=80)
-print("Hi")
+train_images, test_images, train_labels, test_labels = train_test_split(data, labels, test_size=0.2, random_state=80)

@@ -1,0 +1,81 @@
+import cv2
+from models import UNet_3Plus
+import os
+import numpy as np
+from torchvision import transforms
+from torch.utils.data import Dataset
+from PIL import Image
+import matplotlib.pyplot as plt
+
+model = UNet_3Plus.UNet_3Plus_DeepSup()
+
+"""
+Transform the images of the original and labeled data into arrays.
+Split the data into training and test sets.
+"""
+
+
+def get_image_files(data_path):
+    return sorted(os.listdir(data_path))
+
+
+def load_images_from_directory(directory):
+    images = []
+    image_files = sorted(os.listdir(directory))
+
+    for image_file in image_files:
+        image = cv2.imread(os.path.join(directory, image_file), cv2.IMREAD_UNCHANGED)
+        images.append(image)
+    return images
+
+
+data_directory = "data/"
+label_directory = "labels/"
+data = load_images_from_directory(data_directory)
+labels = load_images_from_directory(label_directory)
+
+
+# train_images, test_images, train_labels, test_labels = train_test_split(data, labels, test_size=0.2, random_state=80)
+
+"""
+Create a class to load our data into a dataloader and sclae the u16bit and u8bit to [0,1]
+"""
+
+
+class CustomSegmentationDataset(Dataset):
+    def __init__(self, image_dir, mask_dir, transform):
+        self.image_dir = image_dir
+        self.mask_dir = mask_dir
+        self.transform = transform
+        self.images = sorted(os.listdir(self.image_dir))
+        self.masks = sorted(os.listdir(self.mask_dir))
+
+    def __len__(self):
+        return len(self.images)
+
+    def __getitem__(self, idx):
+        image = Image.open(os.path.join(self.image_dir, self.images[idx]))
+        mask = Image.open(os.path.join(self.mask_dir, self.masks[idx]))
+
+        if self.transform is not None:
+            image = np.asarray(image) / 65535  # scale u16 bit to [0,1]
+            image = Image.fromarray(image)
+            image = self.transform(image)
+            mask = self.transform(mask)
+
+        return image, mask
+
+
+transform = transforms.Compose(
+    [transforms.ToTensor()
+     ])
+custom_dataset = CustomSegmentationDataset(image_dir="data/", mask_dir="labels/", transform=transform)
+test = custom_dataset[0]
+
+### Visualize ###
+plt.imshow(test[0][0], cmap="viridis")
+plt.colorbar()  # Add a colorbar to the plot
+plt.show()
+plt.imshow(test[1][0], cmap="viridis")
+plt.colorbar()  # Add a colorbar to the plot
+plt.show()

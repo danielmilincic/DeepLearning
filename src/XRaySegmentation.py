@@ -58,7 +58,32 @@ class CustomSegmentationDataset(Dataset):
         mask = Image.open(os.path.join(self.mask_dir, self.masks[idx]))
 
         if self.transform is not None:
-            image = np.asarray(image) / 65535  # scale u16 bit to [0,1]
+            image = np.asarray(image)
+            image_6 = np.concatenate(image/65535)
+            min_value = image.min()
+            max_value = image.max()
+            image = (image - min_value) * (1 / (max_value - min_value)) # scales the picture such that the minimum vlaue = 0 and the max = 1
+            # image = image / 65535 # scales the picture to be in [0,1]
+
+            fig, (ax1, ax2) = plt.subplots(2)
+
+            # Plot histograms on the first subplot
+            ax1.hist(image_6, bins=500, color='blue', alpha=0.7, label='Histogram 1')
+            ax1.set_ylabel('Frequency for Histogram 1')
+
+            # Plot histograms on the second subplot
+            ax2.hist(np.concatenate(image), bins=500, color='green', alpha=0.7, label='Histogram 2')
+            ax2.set_ylabel('Frequency for Histogram 2')
+            # Set the x-axis limits from 0 to 1
+            ax1.set_xlim(0, 1)
+            ax2.set_xlim(0, 1)
+
+            # Add legends to the subplots
+            ax1.legend()
+            ax2.legend()
+            plt.show()
+
+
             image = Image.fromarray(image)
             image = self.transform(image)
             mask = self.transform(mask)
@@ -71,8 +96,10 @@ transform = transforms.Compose(
      ])
 custom_dataset = CustomSegmentationDataset(image_dir="data/", mask_dir="labels/", transform=transform)
 test = custom_dataset[0]
+print(test)
 
 ### Visualize ###
+
 plt.imshow(test[0][0], cmap="viridis")
 plt.colorbar()  # Add a colorbar to the plot
 plt.show()

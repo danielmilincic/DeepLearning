@@ -3,11 +3,15 @@ from models import UNet_3Plus
 import os
 import numpy as np
 from torchvision import transforms
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, random_split, DataLoader
 from PIL import Image
 import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+import torch
+from UNet_3Plus import UNet_3Plus
 
-model = UNet_3Plus.UNet_3Plus_DeepSup()
+
+# model = UNet_3Plus.UNet_3Plus_DeepSup()
 
 """
 Transform the images of the original and labeled data into arrays.
@@ -45,26 +49,27 @@ Create a class to load our data into a dataloader and sclae the u16bit and u8bit
 class CustomSegmentationDataset(Dataset):
     def __init__(self, image_dir, mask_dir, transform):
         self.image_dir = image_dir
-        self.mask_dir = mask_dir
+        self.label_dir = mask_dir
         self.transform = transform
         self.images = sorted(os.listdir(self.image_dir))
-        self.masks = sorted(os.listdir(self.mask_dir))
+        self.labels = sorted(os.listdir(self.label_dir))
 
     def __len__(self):
         return len(self.images)
 
     def __getitem__(self, idx):
         image = Image.open(os.path.join(self.image_dir, self.images[idx]))
-        mask = Image.open(os.path.join(self.mask_dir, self.masks[idx]))
+        label = Image.open(os.path.join(self.label_dir, self.labels[idx]))
 
         if self.transform is not None:
             image = np.asarray(image)
-            image_6 = np.concatenate(image/65535)
+            image = image/65535
             min_value = image.min()
             max_value = image.max()
             image = (image - min_value) * (1 / (max_value - min_value)) # scales the picture such that the minimum vlaue = 0 and the max = 1
             # image = image / 65535 # scales the picture to be in [0,1]
 
+            """"
             fig, (ax1, ax2) = plt.subplots(2)
 
             # Plot histograms on the first subplot
@@ -82,27 +87,31 @@ class CustomSegmentationDataset(Dataset):
             ax1.legend()
             ax2.legend()
             plt.show()
-
-
+            """
             image = Image.fromarray(image)
             image = self.transform(image)
-            mask = self.transform(mask)
+            label = self.transform(label)
 
-        return image, mask
+        return image,label
 
 
 transform = transforms.Compose(
     [transforms.ToTensor()
      ])
-custom_dataset = CustomSegmentationDataset(image_dir="data/", mask_dir="labels/", transform=transform)
-test = custom_dataset[0]
-print(test)
 
-### Visualize ###
+dataset = CustomSegmentationDataset(image_dir="data/", mask_dir="labels/", transform=transform)
+train_size = int(0.8 * len(dataset))
+test_size = len(dataset) - train_size
+train_data, test_data = random_split(dataset, [train_size, test_size])
 
-plt.imshow(test[0][0], cmap="viridis")
-plt.colorbar()  # Add a colorbar to the plot
-plt.show()
-plt.imshow(test[1][0], cmap="viridis")
-plt.colorbar()  # Add a colorbar to the plot
-plt.show()
+train_dataloader = DataLoader(train_data, shuffle=False)
+test_dataloader = DataLoader(test_data, shuffle=False)
+
+for image, label in train_dataloader:
+    print(image, label)
+
+
+
+
+
+

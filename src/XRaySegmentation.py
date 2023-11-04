@@ -11,12 +11,24 @@ from UNet_3Plus import UNet_3Plus
 import torch.nn.functional as F
 
 
-# model = UNet_3Plus.UNet_3Plus_DeepSup()
-
-"""
-Transform the images of the original and labeled data into arrays.
-Split the data into training and test sets.
-"""
+def plot_image_and_label(dataset, idx):
+    """
+    Plots one image and its corresponding mask.
+    :param dataset: Test or train dataset
+    :param idx: Index of the image and label to be plotted
+    :return: None
+    """
+    sample = np.asarray(dataset[idx])
+    image = sample[0].reshape(512, 512)
+    label = sample[1].reshape(512, 512)
+    fig, axs = plt.subplots(1, 2)
+    axs[0].imshow(image, cmap="viridis")
+    axs[0].set_title("Image")
+    axs[0].axis('off')
+    axs[1].imshow(label, cmap="viridis")
+    axs[1].set_title("Label")
+    axs[1].axis('off')
+    plt.show()
 
 
 def get_image_files(data_path):
@@ -39,10 +51,8 @@ data = load_images_from_directory(data_directory)
 labels = load_images_from_directory(label_directory)
 
 
-# train_images, test_images, train_labels, test_labels = train_test_split(data, labels, test_size=0.2, random_state=80)
-
 """
-Create a class to load our data into a dataloader and sclae the u16bit and u8bit to [0,1]
+Create a class to load our data into a dataloader and scale the u16bit and u8bit to [0,1]
 """
 
 
@@ -63,11 +73,11 @@ class CustomSegmentationDataset(Dataset):
 
         if self.transform is not None:
             image = np.asarray(image)
-            image = image/65535
+            image = image / 65535
             min_value = image.min()
             max_value = image.max()
-            image = (image - min_value) * (1 / (max_value - min_value)) # scales the picture such that the minimum vlaue = 0 and the max = 1
-            # image = image / 65535 # scales the picture to be in [0,1]
+            image = (image - min_value) * (1 / (
+                        max_value - min_value))  # scales the picture such that the minimum vlaue = 0 and the max = 1
 
             """"
             fig, (ax1, ax2) = plt.subplots(2)
@@ -88,35 +98,43 @@ class CustomSegmentationDataset(Dataset):
             ax2.legend()
             plt.show()
             """
+
             image = Image.fromarray(image)
             image = self.transform(image)
             label = self.transform(label)
 
-            image = F.pad(image, (5,6,5,6))
-            label = F.pad(label, (5,6,5,6))
-
-        return image,label
+        return image, label
 
 
+"""
+Transform the data. Currently resizing it to (512,512) but we could also pad or crop. 
+"""
 transform = transforms.Compose(
-    [transforms.ToTensor()
+    [transforms.ToTensor(), transforms.Resize((512, 512), antialias=True)
      ])
 
+"""
+Create dataset and split it into train and test sets. Load the test and train set into a dataloader.
+"""
 dataset = CustomSegmentationDataset(image_dir="data/", mask_dir="labels/", transform=transform)
-train_size = int(0.8 * len(dataset))
-test_size = len(dataset) - train_size
-train_data, test_data = random_split(dataset, [train_size, test_size])
 
-train_dataloader = DataLoader(train_data, shuffle=False, batch_size=2) # should be (2,1,500, 500)
-test_dataloader = DataLoader(test_data, shuffle=False, batch_size=2)
+random_seed = torch.Generator().manual_seed(80)
+train_data, test_data, val_data = random_split(dataset, [0.8, 0.1, 0.1], random_seed)
 
+plot_image_and_label(train_data, 1)
+
+train_dataloader = DataLoader(train_data, shuffle=False, batch_size=1)
+test_dataloader = DataLoader(test_data, shuffle=False, batch_size=1)
+
+"""
+Create model
+"""
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model = UNet_3Plus(in_channels=1).to(device)
 criterion = torch.nn.BCELoss()
 optimizer = torch.optim.Adam(model.parameters())
 
 for image, label in train_dataloader:
-    # print(image, label)
     image = image.to(device)
     label = label.to(device)
 
@@ -128,9 +146,3 @@ for image, label in train_dataloader:
     optimizer.zero_grad()
     loss.backward()
     optimizer.step()
-
-
-
-
-
-

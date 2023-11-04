@@ -7,6 +7,8 @@ from PIL import Image
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 import torch
+from UNet_3Plus import UNet_3Plus
+import torch.nn.functional as F
 
 
 # model = UNet_3Plus.UNet_3Plus_DeepSup()
@@ -90,6 +92,9 @@ class CustomSegmentationDataset(Dataset):
             image = self.transform(image)
             label = self.transform(label)
 
+            image = F.pad(image, (5,6,5,6))
+            label = F.pad(label, (5,6,5,6))
+
         return image,label
 
 
@@ -102,11 +107,27 @@ train_size = int(0.8 * len(dataset))
 test_size = len(dataset) - train_size
 train_data, test_data = random_split(dataset, [train_size, test_size])
 
-train_dataloader = DataLoader(train_data, shuffle=False)
-test_dataloader = DataLoader(test_data, shuffle=False)
+train_dataloader = DataLoader(train_data, shuffle=False, batch_size=2) # should be (2,1,500, 500)
+test_dataloader = DataLoader(test_data, shuffle=False, batch_size=2)
+
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+model = UNet_3Plus(in_channels=1).to(device)
+criterion = torch.nn.BCELoss()
+optimizer = torch.optim.Adam(model.parameters())
 
 for image, label in train_dataloader:
-    print(image, label)
+    # print(image, label)
+    image = image.to(device)
+    label = label.to(device)
+
+    # Forward pass
+    outputs = model(image)
+    loss = criterion(outputs, label)
+
+    # Backward and optimize
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()
 
 
 

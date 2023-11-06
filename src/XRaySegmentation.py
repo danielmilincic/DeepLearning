@@ -11,23 +11,32 @@ from UNet_3Plus import UNet_3Plus
 import torch.nn.functional as F
 
 
-def plot_image_and_label(dataset, idx):
+def plot_image_and_label_output(image, label, output = None):
     """
     Plots one image and its corresponding mask.
     :param dataset: Test or train dataset
     :param idx: Index of the image and label to be plotted
     :return: None
     """
-    sample = np.asarray(dataset[idx])
-    image = sample[0].reshape(512, 512)
-    label = sample[1].reshape(512, 512)
-    fig, axs = plt.subplots(1, 2)
+    image = image.reshape(512, 512)
+    label = label.reshape(512, 512)
+    output = output.reshape(512, 512)
+
+    if output is not None:
+        fig, axs = plt.subplots(1, 3)
+    else:
+        fig, axs = plt.subplots(1, 2)
+
     axs[0].imshow(image, cmap="viridis")
     axs[0].set_title("Image")
     axs[0].axis('off')
     axs[1].imshow(label, cmap="viridis")
     axs[1].set_title("Label")
     axs[1].axis('off')
+    if output is not None:
+        axs[2].imshow(output, cmap="viridis")
+        axs[2].set_title("Output")
+        axs[2].axis('off')
     plt.show()
 
 
@@ -78,27 +87,6 @@ class CustomSegmentationDataset(Dataset):
             max_value = image.max()
             image = (image - min_value) * (1 / (
                         max_value - min_value))  # scales the picture such that the minimum vlaue = 0 and the max = 1
-
-            """"
-            fig, (ax1, ax2) = plt.subplots(2)
-
-            # Plot histograms on the first subplot
-            ax1.hist(image_6, bins=500, color='blue', alpha=0.7, label='Histogram 1')
-            ax1.set_ylabel('Frequency for Histogram 1')
-
-            # Plot histograms on the second subplot
-            ax2.hist(np.concatenate(image), bins=500, color='green', alpha=0.7, label='Histogram 2')
-            ax2.set_ylabel('Frequency for Histogram 2')
-            # Set the x-axis limits from 0 to 1
-            ax1.set_xlim(0, 1)
-            ax2.set_xlim(0, 1)
-
-            # Add legends to the subplots
-            ax1.legend()
-            ax2.legend()
-            plt.show()
-            """
-
             image = Image.fromarray(image)
             image = self.transform(image)
             label = self.transform(label)
@@ -121,7 +109,7 @@ dataset = CustomSegmentationDataset(image_dir="data/", mask_dir="labels/", trans
 random_seed = torch.Generator().manual_seed(80)
 train_data, test_data, val_data = random_split(dataset, [0.8, 0.1, 0.1], random_seed)
 
-plot_image_and_label(train_data, 1)
+# plot_image_and_label(train_data, 1)
 
 train_dataloader = DataLoader(train_data, shuffle=False, batch_size=1)
 test_dataloader = DataLoader(test_data, shuffle=False, batch_size=1)
@@ -134,15 +122,18 @@ model = UNet_3Plus(in_channels=1).to(device)
 criterion = torch.nn.BCELoss()
 optimizer = torch.optim.Adam(model.parameters())
 
-for image, label in train_dataloader:
+for idx,(image, label) in enumerate(train_dataloader):
     image = image.to(device)
     label = label.to(device)
-
     # Forward pass
     outputs = model(image)
     loss = criterion(outputs, label)
-
+    if idx % 50 == 0:
+        print(f'Iteration {idx}, Loss: {loss.item()}')
     # Backward and optimize
     optimizer.zero_grad()
     loss.backward()
     optimizer.step()
+
+    # plot_image_and_label_output(image, label, outputs)
+

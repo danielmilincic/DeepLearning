@@ -1,4 +1,4 @@
-from UNet_3Plus import UNet_3Plus
+"""from UNet_3Plus import UNet_3Plus
 import torch
 from torch import nn
 from torch.utils.data import TensorDataset
@@ -57,3 +57,8 @@ for epoch in range(num_epochs):
 
         if (i + 1) % 100 == 0:
             print(f"Epoch [{epoch + 1}/{num_epochs}], Step [{i + 1}/{len(train_loader)}], Loss: {loss.item()}")
+"""
+
+import torch
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+print('Using device:', device)

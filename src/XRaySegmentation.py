@@ -87,27 +87,6 @@ class CustomSegmentationDataset(Dataset):
             max_value = image.max()
             image = (image - min_value) * (1 / (
                         max_value - min_value))  # scales the picture such that the minimum vlaue = 0 and the max = 1
-
-            """"
-            fig, (ax1, ax2) = plt.subplots(2)
-
-            # Plot histograms on the first subplot
-            ax1.hist(image_6, bins=500, color='blue', alpha=0.7, label='Histogram 1')
-            ax1.set_ylabel('Frequency for Histogram 1')
-
-            # Plot histograms on the second subplot
-            ax2.hist(np.concatenate(image), bins=500, color='green', alpha=0.7, label='Histogram 2')
-            ax2.set_ylabel('Frequency for Histogram 2')
-            # Set the x-axis limits from 0 to 1
-            ax1.set_xlim(0, 1)
-            ax2.set_xlim(0, 1)
-
-            # Add legends to the subplots
-            ax1.legend()
-            ax2.legend()
-            plt.show()
-            """
-
             image = Image.fromarray(image)
             image = self.transform(image)
             label = self.transform(label)
@@ -144,26 +123,17 @@ criterion = torch.nn.BCELoss()
 optimizer = torch.optim.Adam(model.parameters())
 
 for idx,(image, label) in enumerate(train_dataloader):
-    if idx > 1:
-        break
     image = image.to(device)
     label = label.to(device)
-
     # Forward pass
     outputs = model(image)
     loss = criterion(outputs, label)
-
+    if idx % 50 == 0:
+        print(f'Iteration {idx}, Loss: {loss.item()}')
     # Backward and optimize
     optimizer.zero_grad()
     loss.backward()
     optimizer.step()
 
-    # Plot results
-    image = image.cpu().numpy()
-    label = label.cpu().numpy()
-    outputs = outputs.cpu().detach().numpy()
-    # image = image.reshape(512, 512)
-    # label = label.reshape(512, 512)
-    # outputs = outputs.reshape(512, 512)
-    plot_image_and_label_output(image, label, outputs)
+    # plot_image_and_label_output(image, label, outputs)
 

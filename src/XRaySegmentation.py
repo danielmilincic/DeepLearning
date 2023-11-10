@@ -10,48 +10,57 @@ from sklearn.model_selection import train_test_split
 import torch
 from UNet_3Plus import UNet_3Plus
 import torch.nn.functional as F
+from iouLoss import *
 
 
-def map_values(tensor, lower_threshold, upper_threshold):
-    # Values below the lower threshold are mapped to 0
-    tensor[tensor < lower_threshold] = 0
+def map_values(input_img, lower_threshold, upper_threshold):
+    """
+    :param input_img: Input images that has values in [0, 1],
+    :param lower_threshold: Lower bound of the decision interval.
+    :param upper_threshold: Upper bound of the decision interval.
+    :return: reuturn a numpy array of the image with mapped values to 0, 0.5 and 1.
+    """
+    input_img[input_img < lower_threshold] = 0
+    input_img[(input_img >= lower_threshold) & (input_img < upper_threshold)] = 0.5
+    input_img[input_img >= upper_threshold] = 1
 
-    # Values between the lower and upper thresholds are mapped to 1/2
-    tensor[(tensor >= lower_threshold) & (tensor < upper_threshold)] = 0.5
-
-    # Values equal to or above the upper threshold are mapped to 1
-    tensor[tensor >= upper_threshold] = 1
-
-    return tensor
+    return input_img.detach().cpu().numpy()
 
 def accuracy(target, pred):
-    map_pred = map_values(pred, 0.3, 0.7)
-    return metrics.accuracy_score(target.detach().cpu().numpy(), pred.detach().cpu().numpy())
+    """
+    :param target: Ground truth.
+    :param pred: Output of our model.
+    :return: Returns the percentage correct pixel (ground truth == model output).
+    """
+    map_pred = map_values(pred, 1/3, 2/3)
+    target = np.round(target.detach().cpu().numpy())
+    matches = np.sum(target == map_pred)
+    return matches / target.size
 
 def plot_image_and_label_output(image, label, output = None):
     """
-    Plots one image and its corresponding mask.
+    Converts the tensors(1,1,X,Y) to numpy arrays(X,Y) and plots them.
     :param dataset: Test or train dataset
     :param idx: Index of the image and label to be plotted
     :return: None
     """
-    image = image.reshape(512, 512)
-    label = label.reshape(512, 512)
-    output = output.reshape(512, 512)
+    image = image.detach().cpu().squeeze().numpy()
+    label = label.detach().cpu().squeeze().numpy()
+    output = output.detach().cpu().squeeze().numpy()
 
     if output is not None:
         fig, axs = plt.subplots(1, 3)
     else:
         fig, axs = plt.subplots(1, 2)
 
-    axs[0].imshow(image, cmap="viridis")
+    axs[0].imshow(image, cmap="magma")
     axs[0].set_title("Image")
     axs[0].axis('off')
-    axs[1].imshow(label, cmap="viridis")
+    axs[1].imshow(label, cmap="magma")
     axs[1].set_title("Label")
     axs[1].axis('off')
     if output is not None:
-        axs[2].imshow(output, cmap="viridis")
+        axs[2].imshow(output, cmap="magma")
         axs[2].set_title("Output")
         axs[2].axis('off')
     plt.show()
@@ -113,10 +122,14 @@ class CustomSegmentationDataset(Dataset):
 
 
 """
-Transform the data. Currently resizing it to (512,512) but we could also pad or crop. 
+Transform the data. Use transform_dummy to check the model functionality. 
 """
 transform = transforms.Compose(
-    [transforms.ToTensor(), transforms.Resize((512, 512), antialias=True)
+    [transforms.ToTensor(), transforms.Pad((6,6,5,5), padding_mode="edge")
+     ])
+
+transform_dummy = transforms.Compose(
+    [transforms.ToTensor(), transforms.Resize((64,64))
      ])
 
 """
@@ -139,12 +152,12 @@ Create model
 print("Creating Model ")
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model = UNet_3Plus(in_channels=1).to(device)
-criterion = torch.nn.BCELoss()
-optimizer = torch.optim.Adam(model.parameters())
+#loss_fn = torch.nn.BCELoss()
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
 
 batch_size = 10
 num_epochs = 2
-validation_every_steps = 50
+validation_every_steps = 20
 
 step = 0
 model.train()
@@ -158,18 +171,10 @@ for epoch in range(num_epochs):
     
     for inputs, targets in train_dataloader:
         inputs, targets = inputs.to(device), targets.to(device)
-        
-        # Forward pass, compute gradients, perform one training step.
-        # Your code here!
-        # wrap them in Variable
-        # inputs, labels = Variable(inputs), Variable(labels)
 
-        # zero the parameter gradients
-        optimizer.zero_grad()
-        
-        # forward, backward, optimize
         output = model(inputs)
-        loss = criterion(output, targets)
+        loss = IOU_loss(output, targets)
+        optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
@@ -177,6 +182,7 @@ for epoch in range(num_epochs):
         step += 1
 
         #print(mapped_tensor)
+        print(f"Accuracy = {accuracy(targets, output)}")
         train_accuracies_batches.append(accuracy(targets, output))
         
         if step % validation_every_steps == 0:
@@ -193,7 +199,7 @@ for epoch in range(num_epochs):
                 for inputs, targets in val_dataloader:
                     inputs, targets = inputs.to(device), targets.to(device)
                     output = model(inputs)
-                    loss = optimizer(output, targets)
+                    loss = IOU_loss(output, targets)
 
                     # Multiply by len(x) because the final batch of DataLoader may be smaller (drop_last=False).
                     valid_accuracies_batches.append(accuracy(targets, output) * len(inputs))
@@ -205,61 +211,6 @@ for epoch in range(num_epochs):
      
             print(f"Step {step:<5}   training accuracy: {train_accuracies[-1]}")
             print(f"             test accuracy: {valid_accuracies[-1]}")
+            plot_image_and_label_output(inputs, targets, output)
 
 print("Finished training.")
-
-"""
-batch_size = 64
-num_epochs = 20
-validation_every_steps = 500
-
-step = 0
-model.train()
-# Training phase
-for epoch in range(num_epochs):
-    model.train()
-    for idx, (image, label) in enumerate(train_dataloader):
-        image = image.to(device)
-        label = label.to(device)
-
-        # Forward pass
-        outputs = model(image)
-        loss = criterion(outputs, label)
-
-        # Backward and optimize
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-
-        print(f'Training Iteration {idx}, Loss: {loss.item()}')
-
-        model.eval()
-        with torch.no_grad():
-            image = image.to(device)
-            label = label.to(device)
-
-            # Forward pass
-            outputs = model(image)
-            val_loss = criterion(outputs, label)
-
-            print(f'Validation Loss: {val_loss.item()}')
-
-
-"""
-"""
-for idx,(image, label) in enumerate(train_dataloader):
-    image = image.to(device)
-    label = label.to(device)
-    # Forward pass
-    outputs = model(image)
-    loss = criterion(outputs, label)
-    if idx % 50 == 0:
-        print(f'Iteration {idx}, Loss: {loss.item()}')
-    # Backward and optimize
-    optimizer.zero_grad()
-    loss.backward()
-    optimizer.step()
-
-    # plot_image_and_label_output(image, label, outputs)
-    # new 
-"""

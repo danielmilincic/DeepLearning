@@ -77,19 +77,20 @@ class CustomSegmentationDataset(Dataset):
         return len(self.images)
 
     def __getitem__(self, idx):
-        image = Image.open(os.path.join(self.image_dir, self.images[idx]))
-        label = Image.open(os.path.join(self.label_dir, self.labels[idx]))
+        image_path = os.path.join(self.image_dir, self.images[idx])
+        label_path = os.path.join(self.label_dir, self.labels[idx])
+        image = Image.open(image_path)
+        label = Image.open(label_path)
 
-        if self.transform is not None:
-            image = np.asarray(image)
-            image = image / 65535
-            min_value = image.min()
-            max_value = image.max()
-            image = (image - min_value) * (1 / (
-                        max_value - min_value))  # scales the picture such that the minimum vlaue = 0 and the max = 1
-            image = Image.fromarray(image)
-            image = self.transform(image)
-            label = self.transform(label)
+        image, label = self.apply_transform(image, label)
+        return image, label
+
+    def apply_transform(self, image, label):
+        image = np.asarray(image) / (2**16-1) # scale it to [0,1]
+        image = (image - image.min()) / (image.max() - image.min()) # stretch it to include 0 and 1
+        image = Image.fromarray((image * 255).astype(np.uint8)) #  convert it back to
+        image = self.transform(image)
+        label = self.transform(label)
 
         return image, label
 
@@ -108,8 +109,6 @@ dataset = CustomSegmentationDataset(image_dir="data/", mask_dir="labels/", trans
 
 random_seed = torch.Generator().manual_seed(80)
 train_data, test_data, val_data = random_split(dataset, [0.8, 0.1, 0.1], random_seed)
-
-# plot_image_and_label(train_data, 1)
 
 train_dataloader = DataLoader(train_data, shuffle=False, batch_size=1)
 test_dataloader = DataLoader(test_data, shuffle=False, batch_size=1)

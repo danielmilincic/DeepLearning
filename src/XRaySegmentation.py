@@ -117,6 +117,7 @@ test_dataloader = DataLoader(test_data, shuffle=False, batch_size=1)
 """
 Create model
 """
+print("Creating Model ")
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model = UNet_3Plus(in_channels=1).to(device)
 criterion = torch.nn.BCELoss()

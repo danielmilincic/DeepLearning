@@ -136,4 +136,4 @@ for idx,(image, label) in enumerate(train_dataloader):
     optimizer.step()
 
     # plot_image_and_label_output(image, label, outputs)
-
+    # new 

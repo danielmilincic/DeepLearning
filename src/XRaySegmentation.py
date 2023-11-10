@@ -32,12 +32,12 @@ def accuracy(target, pred):
     :param pred: Output of our model.
     :return: Returns the percentage correct pixel (ground truth == model output).
     """
-    map_pred = map_values(pred, 1/3, 2/3)
+    map_pred = map_values(pred, 0.33, 0.66)
     target = np.round(target.detach().cpu().numpy())
     matches = np.sum(target == map_pred)
     return matches / target.size
 
-def plot_image_and_label_output(image, label, output = None):
+def plot_image_and_label_output(image, label, step, output = None):
     """
     Converts the tensors(1,1,X,Y) to numpy arrays(X,Y) and plots them.
     :param dataset: Test or train dataset
@@ -63,7 +63,7 @@ def plot_image_and_label_output(image, label, output = None):
         axs[2].imshow(output, cmap="magma")
         axs[2].set_title("Output")
         axs[2].axis('off')
-    plt.show()
+    plt.savefig(f"{step}.png")
 
 
 def get_image_files(data_path):
@@ -181,8 +181,7 @@ for epoch in range(num_epochs):
         # Increment step counter
         step += 1
 
-        #print(mapped_tensor)
-        print(f"Accuracy = {accuracy(targets, output)}")
+        # print(f"Accuracy = {accuracy(targets, output)}")
         train_accuracies_batches.append(accuracy(targets, output))
         
         if step % validation_every_steps == 0:
@@ -203,7 +202,6 @@ for epoch in range(num_epochs):
 
                     # Multiply by len(x) because the final batch of DataLoader may be smaller (drop_last=False).
                     valid_accuracies_batches.append(accuracy(targets, output) * len(inputs))
-
                 model.train()
                 
             # Append average validation accuracy to list.
@@ -211,6 +209,6 @@ for epoch in range(num_epochs):
      
             print(f"Step {step:<5}   training accuracy: {train_accuracies[-1]}")
             print(f"             test accuracy: {valid_accuracies[-1]}")
-            plot_image_and_label_output(inputs, targets, output)
+            plot_image_and_label_output(inputs, targets, step, output)
 
 print("Finished training.")

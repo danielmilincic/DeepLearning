@@ -13,18 +13,12 @@ import torch.nn.functional as F
 from iouLoss import *
 
 
-def map_values(input_img, lower_threshold, upper_threshold):
+def map_target_to_class(labels):
     """
-    :param input_img: Input images that has values in [0, 1],
-    :param lower_threshold: Lower bound of the decision interval.
-    :param upper_threshold: Upper bound of the decision interval.
-    :return: reuturn a numpy array of the image with mapped values to 0, 0.5 and 1.
+    :param labels: input labels.
+    :return: Returns a tensor with the classes 0,1 and 2.
     """
-    input_img[input_img < lower_threshold] = 0
-    input_img[(input_img >= lower_threshold) & (input_img < upper_threshold)] = 0.5
-    input_img[input_img >= upper_threshold] = 1
-
-    return input_img.detach().cpu().numpy()
+    return torch.round(labels * 2).squeeze(1).long()
 
 def accuracy(target, pred):
     """
@@ -32,9 +26,9 @@ def accuracy(target, pred):
     :param pred: Output of our model.
     :return: Returns the percentage correct pixel (ground truth == model output).
     """
-    map_pred = map_values(pred, 0.33, 0.66)
-    target = np.round(target.detach().cpu().numpy())
-    matches = np.sum(target == map_pred)
+    map_pred = torch.argmax(pred, dim=1)
+    target = target.detach().cpu().numpy()
+    matches = np.sum(target == np.round(map_pred.detach().cpu().numpy()))
     return matches / target.size
 
 def plot_image_and_label_output(image, label, step, output = None):
@@ -63,7 +57,7 @@ def plot_image_and_label_output(image, label, step, output = None):
         axs[2].imshow(output, cmap="magma")
         axs[2].set_title("Output")
         axs[2].axis('off')
-    plt.savefig(f"{step}.png")
+    plt.savefig(f"img/example_output_{step}.png")
 
 
 def get_image_files(data_path):
@@ -115,49 +109,49 @@ class CustomSegmentationDataset(Dataset):
         image = np.asarray(image) / (2**16-1) # scale it to [0,1]
         image = (image - image.min()) / (image.max() - image.min()) # stretch it to include 0 and 1
         image = Image.fromarray((image * 255).astype(np.uint8)) #  convert it back to
+
         image = self.transform(image)
         label = self.transform(label)
 
         return image, label
 
 
-"""
-Transform the data. Use transform_dummy to check the model functionality. 
-"""
+# Transform the data. Use transform_dummy to check the model functionality.
 transform = transforms.Compose(
     [transforms.ToTensor(), transforms.Pad((6,6,5,5), padding_mode="edge")
      ])
 
+
+# Transform the data. Use padding to get 2^n x 2^n dimensional images.
 transform_dummy = transforms.Compose(
     [transforms.ToTensor(), transforms.Resize((64,64))
      ])
 
-"""
-Create dataset and split it into train and test sets. Load the test and train set into a dataloader.
-"""
-dataset = CustomSegmentationDataset(image_dir="data/", mask_dir="labels/", transform=transform)
 
-# Split the data into train, validation, and test sets
+# Split the data into train, validation, and test sets Load the test and train set into a dataloader.
+dataset = CustomSegmentationDataset(image_dir="data/", mask_dir="labels/", transform=transform_dummy)
 random_seed = torch.Generator().manual_seed(80)
 train_data, test_data, val_data = random_split(dataset, [0.8, 0.1, 0.1], random_seed)
-
 
 train_dataloader = DataLoader(train_data, shuffle=False, batch_size=1)
 test_dataloader = DataLoader(test_data, shuffle=False, batch_size=1)
 val_dataloader = DataLoader(val_data, shuffle=False, batch_size=1)
 
-"""
-Create model
-"""
+# Create model
 print("Creating Model ")
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-model = UNet_3Plus(in_channels=1).to(device)
-#loss_fn = torch.nn.BCELoss()
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
+model = UNet_3Plus(in_channels=1, n_classes=3).to(device)
+# Use CrossEntropyLoss: Changes the putput of UNet3Plus from softmax to logits
+loss_fn = torch.nn.CrossEntropyLoss()
 
+
+# Define Parameters
 batch_size = 10
 num_epochs = 2
 validation_every_steps = 20
+learning_rate = 1e-4
+
+optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
 step = 0
 model.train()
@@ -172,8 +166,9 @@ for epoch in range(num_epochs):
     for inputs, targets in train_dataloader:
         inputs, targets = inputs.to(device), targets.to(device)
 
+        targets = map_target_to_class(targets)
         output = model(inputs)
-        loss = IOU_loss(output, targets)
+        loss = loss_fn(output, targets)
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
@@ -197,8 +192,9 @@ for epoch in range(num_epochs):
                 model.eval()
                 for inputs, targets in val_dataloader:
                     inputs, targets = inputs.to(device), targets.to(device)
+                    targets = map_target_to_class(targets)
                     output = model(inputs)
-                    loss = IOU_loss(output, targets)
+                    loss = loss_fn(output, targets)
 
                     # Multiply by len(x) because the final batch of DataLoader may be smaller (drop_last=False).
                     valid_accuracies_batches.append(accuracy(targets, output) * len(inputs))
@@ -209,6 +205,6 @@ for epoch in range(num_epochs):
      
             print(f"Step {step:<5}   training accuracy: {train_accuracies[-1]}")
             print(f"             test accuracy: {valid_accuracies[-1]}")
-            plot_image_and_label_output(inputs, targets, step, output)
+            plot_image_and_label_output(inputs, targets, step, torch.argmax(output, dim=1))
 
 print("Finished training.")

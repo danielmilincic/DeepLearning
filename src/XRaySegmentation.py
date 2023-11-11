@@ -13,12 +13,20 @@ import torch.nn.functional as F
 from iouLoss import *
 
 
+# HYPERPARAMETERS
+BATCH_SIZE = 1
+NUM_EPOCHS = 10
+VAL_EVERY_STEPS = 40
+LEARNING_RATE = 1e-4
+
+
 def map_target_to_class(labels):
     """
     :param labels: input labels.
     :return: Returns a tensor with the classes 0,1 and 2.
     """
     return torch.round(labels * 2).squeeze(1).long()
+
 
 def accuracy(target, pred):
     """
@@ -31,7 +39,8 @@ def accuracy(target, pred):
     matches = np.sum(target == np.round(map_pred.detach().cpu().numpy()))
     return matches / target.size
 
-def plot_image_and_label_output(image, label, step, output = None):
+
+def plot_image_and_label_output(image, label, step, output=None):
     """
     Converts the tensors(1,1,X,Y) to numpy arrays(X,Y) and plots them.
     :param dataset: Test or train dataset
@@ -79,7 +88,6 @@ label_directory = "labels/"
 data = load_images_from_directory(data_directory)
 labels = load_images_from_directory(label_directory)
 
-
 """
 Create a class to load our data into a dataloader and scale the u16bit and u8bit to [0,1]
 """
@@ -106,9 +114,9 @@ class CustomSegmentationDataset(Dataset):
         return image, label
 
     def apply_transform(self, image, label):
-        image = np.asarray(image) / (2**16-1) # scale it to [0,1]
-        image = (image - image.min()) / (image.max() - image.min()) # stretch it to include 0 and 1
-        image = Image.fromarray((image * 255).astype(np.uint8)) #  convert it back to
+        image = np.asarray(image) / (2 ** 16 - 1)  # scale it to [0,1]
+        image = (image - image.min()) / (image.max() - image.min())  # stretch it to include 0 and 1
+        image = Image.fromarray((image * 255).astype(np.uint8))  # convert it back to
 
         image = self.transform(image)
         label = self.transform(label)
@@ -118,24 +126,22 @@ class CustomSegmentationDataset(Dataset):
 
 # Transform the data. Use transform_dummy to check the model functionality.
 transform = transforms.Compose(
-    [transforms.ToTensor(), transforms.Pad((6,6,5,5), padding_mode="edge")
+    [transforms.ToTensor(), transforms.Pad((6, 6, 5, 5), padding_mode="edge")
      ])
-
 
 # Transform the data. Use padding to get 2^n x 2^n dimensional images.
 transform_dummy = transforms.Compose(
-    [transforms.ToTensor(), transforms.Resize((64,64))
+    [transforms.ToTensor(), transforms.Resize((64, 64))
      ])
-
 
 # Split the data into train, validation, and test sets Load the test and train set into a dataloader.
 dataset = CustomSegmentationDataset(image_dir="data/", mask_dir="labels/", transform=transform_dummy)
 random_seed = torch.Generator().manual_seed(80)
 train_data, test_data, val_data = random_split(dataset, [0.8, 0.1, 0.1], random_seed)
 
-train_dataloader = DataLoader(train_data, shuffle=False, batch_size=1)
-test_dataloader = DataLoader(test_data, shuffle=False, batch_size=1)
-val_dataloader = DataLoader(val_data, shuffle=False, batch_size=1)
+train_dataloader = DataLoader(train_data, shuffle=False, batch_size=BATCH_SIZE)
+test_dataloader = DataLoader(test_data, shuffle=False, batch_size=BATCH_SIZE)
+val_dataloader = DataLoader(val_data, shuffle=False, batch_size=BATCH_SIZE)
 
 # Create model
 print("Creating Model ")
@@ -144,31 +150,25 @@ model = UNet_3Plus(in_channels=1, n_classes=3).to(device)
 # Use CrossEntropyLoss: Changes the putput of UNet3Plus from softmax to logits
 loss_fn = torch.nn.CrossEntropyLoss()
 
-
-# Define Parameters
-batch_size = 10
-num_epochs = 2
-validation_every_steps = 20
-learning_rate = 1e-4
-
-optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
 step = 0
 model.train()
 
 train_accuracies = []
 valid_accuracies = []
-        
-for epoch in range(num_epochs):
-    
+
+for epoch in range(NUM_EPOCHS):
     train_accuracies_batches = []
-    
+
     for inputs, targets in train_dataloader:
+        model.train()
         inputs, targets = inputs.to(device), targets.to(device)
 
         targets = map_target_to_class(targets)
         output = model(inputs)
         loss = loss_fn(output, targets)
+        print(f"loss = {loss}")
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
@@ -176,16 +176,15 @@ for epoch in range(num_epochs):
         # Increment step counter
         step += 1
 
-        # print(f"Accuracy = {accuracy(targets, output)}")
         train_accuracies_batches.append(accuracy(targets, output))
-        
-        if step % validation_every_steps == 0:
-            
+
+        if step % VAL_EVERY_STEPS == 0:
+
             # Append average training accuracy to list.
             train_accuracies.append(np.mean(train_accuracies_batches))
-            
+
             train_accuracies_batches = []
-        
+
             # Compute accuracies on validation set.
             valid_accuracies_batches = []
             with torch.no_grad():
@@ -199,10 +198,10 @@ for epoch in range(num_epochs):
                     # Multiply by len(x) because the final batch of DataLoader may be smaller (drop_last=False).
                     valid_accuracies_batches.append(accuracy(targets, output) * len(inputs))
                 model.train()
-                
+
             # Append average validation accuracy to list.
             valid_accuracies.append(np.sum(valid_accuracies_batches) / len(val_data))
-     
+
             print(f"Step {step:<5}   training accuracy: {train_accuracies[-1]}")
             print(f"             test accuracy: {valid_accuracies[-1]}")
             plot_image_and_label_output(inputs, targets, step, torch.argmax(output, dim=1))

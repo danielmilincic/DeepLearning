@@ -14,8 +14,8 @@ from iouLoss import *
 
 
 # HYPERPARAMETERS
-BATCH_SIZE = 1
-NUM_EPOCHS = 10
+BATCH_SIZE = 1 # statistical gradient
+NUM_EPOCHS = 4
 VAL_EVERY_STEPS = 40
 LEARNING_RATE = 1e-4
 
@@ -173,6 +173,9 @@ for epoch in range(NUM_EPOCHS):
         loss.backward()
         optimizer.step()
 
+        if step % 200 == 0:
+            plot_image_and_label_output(inputs, targets, step, torch.argmax(output, dim=1))
+
         # Increment step counter
         step += 1
 
@@ -204,7 +207,5 @@ for epoch in range(NUM_EPOCHS):
 
             print(f"Step {step:<5}   training accuracy: {train_accuracies[-1]}")
             print(f"             test accuracy: {valid_accuracies[-1]}")
-        if step == 1 or step % 200:
-            plot_image_and_label_output(inputs, targets, step, torch.argmax(output, dim=1))
 
 print("Finished training.")

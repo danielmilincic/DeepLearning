@@ -2,5 +2,4 @@
 .DS_Store
 .venv/
 .vscode/
-img/
 __pycache__/

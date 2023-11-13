@@ -36,11 +36,11 @@ def accuracy(target, pred):
     """
     map_pred = torch.argmax(pred, dim=1)
     target = target.detach().cpu().numpy()
-    matches = np.sum(target == np.round(map_pred.detach().cpu().numpy()))
+    matches = np.sum(target == map_pred.detach().cpu().numpy())
     return matches / target.size
 
 
-def plot_image_and_label_output(image, label, step, output=None):
+def plot_image_and_label_output(image, label, step,  output=None, name="example_output"):
     """
     Converts the tensors(1,1,X,Y) to numpy arrays(X,Y) and plots them.
     :param dataset: Test or train dataset
@@ -66,7 +66,7 @@ def plot_image_and_label_output(image, label, step, output=None):
         axs[2].imshow(output, cmap="magma")
         axs[2].set_title("Output")
         axs[2].axis('off')
-    plt.savefig(f"img/example_output_{step}.png")
+    plt.savefig(f"img/{name}_{step}.png")
 
 
 def get_image_files(data_path):
@@ -135,7 +135,7 @@ transform_dummy = transforms.Compose(
      ])
 
 # Split the data into train, validation, and test sets Load the test and train set into a dataloader.
-dataset = CustomSegmentationDataset(image_dir="data/", mask_dir="labels/", transform=transform_dummy)
+dataset = CustomSegmentationDataset(image_dir="data/", mask_dir="labels/", transform=transform)
 random_seed = torch.Generator().manual_seed(80)
 train_data, test_data, val_data = random_split(dataset, [0.8, 0.1, 0.1], random_seed)
 
@@ -168,12 +168,13 @@ for epoch in range(NUM_EPOCHS):
         targets = map_target_to_class(targets)
         output = model(inputs)
         loss = loss_fn(output, targets)
-        print(f"loss = {loss}")
+        # if step % VAL_EVERY_STEPS == 0:
+        #    print(f"loss = {loss}")
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
-        if step % 200 == 0:
+        if step % 400 == 0:
             plot_image_and_label_output(inputs, targets, step, torch.argmax(output, dim=1))
 
         # Increment step counter
@@ -196,6 +197,7 @@ for epoch in range(NUM_EPOCHS):
                     inputs, targets = inputs.to(device), targets.to(device)
                     targets = map_target_to_class(targets)
                     output = model(inputs)
+                    #plot_image_and_label_output(inputs, targets, step,  torch.argmax(output, dim=1), name="val")
                     loss = loss_fn(output, targets)
 
                     # Multiply by len(x) because the final batch of DataLoader may be smaller (drop_last=False).

@@ -15,8 +15,8 @@ from iouLoss import *
 
 # HYPERPARAMETERS
 BATCH_SIZE = 1 # statistical gradient
-NUM_EPOCHS = 4
-VAL_EVERY_STEPS = 40
+NUM_EPOCHS = 1
+VAL_EVERY_STEPS = 1
 LEARNING_RATE = 1e-4
 
 
@@ -72,7 +72,6 @@ def plot_image_and_label_output(image, label, step,  output=None, name="example_
 def get_image_files(data_path):
     return sorted(os.listdir(data_path))
 
-
 def load_images_from_directory(directory):
     images = []
     image_files = sorted(os.listdir(directory))
@@ -110,6 +109,14 @@ class CustomSegmentationDataset(Dataset):
         image = Image.open(image_path)
         label = Image.open(label_path)
 
+        # Add Gaussian noise to the image
+        image = np.array(image)
+        mean = 0
+        variance = 10  # You can change this value
+        sigma = np.sqrt(variance)
+        gaussian = np.random.normal(mean, sigma, image.shape)
+        image = image + gaussian
+
         image, label = self.apply_transform(image, label)
         return image, label
 
@@ -137,7 +144,11 @@ transform_dummy = transforms.Compose(
 # Split the data into train, validation, and test sets Load the test and train set into a dataloader.
 dataset = CustomSegmentationDataset(image_dir="data/", mask_dir="labels/", transform=transform)
 random_seed = torch.Generator().manual_seed(80)
+
 train_data, test_data, val_data = random_split(dataset, [0.8, 0.1, 0.1], random_seed)
+# Try to break the model by using only 10 images for training and 450 for validation.
+#train_data, val_data, test_data = random_split(dataset, [10, 3, 487], random_seed)
+
 
 train_dataloader = DataLoader(train_data, shuffle=False, batch_size=BATCH_SIZE)
 test_dataloader = DataLoader(test_data, shuffle=False, batch_size=BATCH_SIZE)
@@ -208,6 +219,6 @@ for epoch in range(NUM_EPOCHS):
             valid_accuracies.append(np.sum(valid_accuracies_batches) / len(val_data))
 
             print(f"Step {step:<5}   training accuracy: {train_accuracies[-1]}")
-            print(f"             test accuracy: {valid_accuracies[-1]}")
+            print(f"             validation accuracy: {valid_accuracies[-1]}")
 
 print("Finished training.")

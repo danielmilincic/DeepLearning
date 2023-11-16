@@ -146,9 +146,9 @@ transform_dummy = transforms.Compose(
 dataset = CustomSegmentationDataset(image_dir="data/", mask_dir="labels/", transform=transform_dummy)
 random_seed = torch.Generator().manual_seed(random.randint(0, 10000))
 
-train_data, test_data, val_data = random_split(dataset, [0.7, 0.1, 0.2], random_seed)
+train_data, test_data, val_data = random_split(dataset, [0.1, 0.3, 0.6], random_seed)
 
-train_dataloader = DataLoader(train_data, shuffle=False, batch_size=BATCH_SIZE)
+train_dataloader = DataLoader(train_data, shuffle=True, batch_size=BATCH_SIZE)
 test_dataloader = DataLoader(test_data, shuffle=False, batch_size=BATCH_SIZE)
 val_dataloader = DataLoader(val_data, shuffle=False, batch_size=BATCH_SIZE)
 

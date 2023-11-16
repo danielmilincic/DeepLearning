@@ -11,10 +11,11 @@ import torch
 from UNet_3Plus import UNet_3Plus
 import torch.nn.functional as F
 from iouLoss import *
+import random
 
 
 # HYPERPARAMETERS
-BATCH_SIZE = 2 
+BATCH_SIZE = 1
 NUM_EPOCHS = 4
 VAL_EVERY_STEPS = 1
 LEARNING_RATE = 1e-4
@@ -120,7 +121,7 @@ class CustomSegmentationDataset(Dataset):
         variance = 0.1  # You can change this value
         sigma = np.sqrt(variance)
         gaussian = np.random.normal(mean, sigma, image.shape)
-        image = image + gaussian
+        #image = image + gaussian
 
         image = (image - image.min()) / (image.max() - image.min())  # stretch it to include 0 and 1
         image = Image.fromarray((image * 255).astype(np.uint8))  # convert it back to
@@ -138,18 +139,14 @@ transform = transforms.Compose(
 
 # Transform the data. Use padding to get 2^n x 2^n dimensional images.
 transform_dummy = transforms.Compose(
-    [transforms.ToTensor(), transforms.Resize((64, 64))
+    [transforms.ToTensor(), transforms.Resize((128, 128))
      ])
 
 # Split the data into train, validation, and test sets Load the test and train set into a dataloader.
-dataset = CustomSegmentationDataset(image_dir="data/", mask_dir="labels/", transform=transform)
-random_seed = torch.Generator().manual_seed(80)
+dataset = CustomSegmentationDataset(image_dir="data/", mask_dir="labels/", transform=transform_dummy)
+random_seed = torch.Generator().manual_seed(random.randint(0, 10000))
 
-train_data, test_data, val_data = random_split(dataset, [0.8, 0.1, 0.1], random_seed)
-
-# Try to break the model by using only 10 images for training and 450 for validation.
-#train_data, val_data, test_data = random_split(dataset, [10, 3, 487], random_seed)
-
+train_data, test_data, val_data = random_split(dataset, [0.7, 0.1, 0.2], random_seed)
 
 train_dataloader = DataLoader(train_data, shuffle=False, batch_size=BATCH_SIZE)
 test_dataloader = DataLoader(test_data, shuffle=False, batch_size=BATCH_SIZE)

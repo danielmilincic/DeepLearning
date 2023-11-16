@@ -14,8 +14,8 @@ from iouLoss import *
 
 
 # HYPERPARAMETERS
-BATCH_SIZE = 1 # statistical gradient
-NUM_EPOCHS = 1
+BATCH_SIZE = 2 
+NUM_EPOCHS = 4
 VAL_EVERY_STEPS = 1
 LEARNING_RATE = 1e-4
 
@@ -109,19 +109,19 @@ class CustomSegmentationDataset(Dataset):
         image = Image.open(image_path)
         label = Image.open(label_path)
 
-        # Add Gaussian noise to the image
-        image = np.array(image)
-        mean = 0
-        variance = 10  # You can change this value
-        sigma = np.sqrt(variance)
-        gaussian = np.random.normal(mean, sigma, image.shape)
-        image = image + gaussian
-
         image, label = self.apply_transform(image, label)
         return image, label
 
     def apply_transform(self, image, label):
         image = np.asarray(image) / (2 ** 16 - 1)  # scale it to [0,1]
+
+        # Add Gaussian noise to the image
+        mean = 0
+        variance = 0.1  # You can change this value
+        sigma = np.sqrt(variance)
+        gaussian = np.random.normal(mean, sigma, image.shape)
+        image = image + gaussian
+
         image = (image - image.min()) / (image.max() - image.min())  # stretch it to include 0 and 1
         image = Image.fromarray((image * 255).astype(np.uint8))  # convert it back to
 
@@ -146,6 +146,7 @@ dataset = CustomSegmentationDataset(image_dir="data/", mask_dir="labels/", trans
 random_seed = torch.Generator().manual_seed(80)
 
 train_data, test_data, val_data = random_split(dataset, [0.8, 0.1, 0.1], random_seed)
+
 # Try to break the model by using only 10 images for training and 450 for validation.
 #train_data, val_data, test_data = random_split(dataset, [10, 3, 487], random_seed)
 
@@ -186,8 +187,8 @@ for epoch in range(NUM_EPOCHS):
         optimizer.step()
 
         if step % 400 == 0:
-            plot_image_and_label_output(inputs, targets, step, torch.argmax(output, dim=1))
-
+            # Plot the first image and label in the batch every 400 steps.
+            plot_image_and_label_output(inputs[0], targets[0], step, torch.argmax(output[0], dim=1))
         # Increment step counter
         step += 1
 

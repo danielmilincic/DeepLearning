@@ -219,4 +219,25 @@ for epoch in range(NUM_EPOCHS):
             print(f"Step {step:<5}   training accuracy: {train_accuracies[-1]}")
             print(f"             validation accuracy: {valid_accuracies[-1]}")
 
+
+## Comment the following lines if you are still tuning your model.
+
+# Test the mode after training and validation (model tuning) are done.
+test_accuracies_batches = []
+with torch.no_grad():
+    model.eval()
+    for inputs, targets in test_dataloader:
+        inputs, targets = inputs.to(device), targets.to(device)
+        targets = map_target_to_class(targets)
+        output = model(inputs)
+        loss = loss_fn(output, targets)
+
+        # Multiply by len(x) because the final batch of DataLoader may be smaller (drop_last=False).
+        test_accuracies_batches.append(accuracy(targets, output) * len(inputs))
+
+# Calculate average test accuracy
+test_accuracy = np.sum(test_accuracies_batches) / len(test_data)
+print(f"Test accuracy: {test_accuracy}")
+
+
 print("Finished training.")

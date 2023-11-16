@@ -16,9 +16,9 @@ import random
 
 # HYPERPARAMETERS
 BATCH_SIZE = 1
-NUM_EPOCHS = 4
+NUM_EPOCHS = 1
 VAL_EVERY_STEPS = 1
-LEARNING_RATE = 1e-4
+LEARNING_RATE = 1e-3
 
 
 def map_target_to_class(labels):
@@ -121,7 +121,8 @@ class CustomSegmentationDataset(Dataset):
         variance = 0.1  # You can change this value
         sigma = np.sqrt(variance)
         gaussian = np.random.normal(mean, sigma, image.shape)
-        #image = image + gaussian
+        ## Comment the following line if you don't want to add noise to the image
+        image = image + gaussian
 
         image = (image - image.min()) / (image.max() - image.min())  # stretch it to include 0 and 1
         image = Image.fromarray((image * 255).astype(np.uint8))  # convert it back to
@@ -130,23 +131,28 @@ class CustomSegmentationDataset(Dataset):
         label = self.transform(label)
 
         return image, label
+    
+# Perform data augmentation (flipping and rotation) on the training set.
+transform_dummy_augmented = transforms.Compose(
+    [transforms.RandomHorizontalFlip(p=0.5), transforms.RandomVerticalFlip(p=0.5),
+     transforms.RandomRotation(degrees=90), transforms.ToTensor(), transforms.Resize((128, 128))
+     ])
 
-
-# Transform the data. Use transform_dummy to check the model functionality.
+# Transform the data. Use padding to get 2^n x 2^n dimensional images. 
 transform = transforms.Compose(
     [transforms.ToTensor(), transforms.Pad((6, 6, 5, 5), padding_mode="edge")
      ])
 
-# Transform the data. Use padding to get 2^n x 2^n dimensional images.
+# Transform the data. Use transform_dummy to check the model functionality.
 transform_dummy = transforms.Compose(
     [transforms.ToTensor(), transforms.Resize((128, 128))
      ])
 
 # Split the data into train, validation, and test sets Load the test and train set into a dataloader.
-dataset = CustomSegmentationDataset(image_dir="data/", mask_dir="labels/", transform=transform_dummy)
+dataset = CustomSegmentationDataset(image_dir="data/", mask_dir="labels/", transform=transform_dummy_augmented)
 random_seed = torch.Generator().manual_seed(random.randint(0, 10000))
 
-train_data, test_data, val_data = random_split(dataset, [0.1, 0.3, 0.6], random_seed)
+train_data, test_data, val_data = random_split(dataset, [0.7, 0.1, 0.2], random_seed)
 
 train_dataloader = DataLoader(train_data, shuffle=True, batch_size=BATCH_SIZE)
 test_dataloader = DataLoader(test_data, shuffle=False, batch_size=BATCH_SIZE)

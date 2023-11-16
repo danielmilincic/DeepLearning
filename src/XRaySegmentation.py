@@ -18,7 +18,7 @@ import random
 BATCH_SIZE = 16
 NUM_EPOCHS = 8
 VAL_EVERY_STEPS = 1
-LEARNING_RATE = 1e-3
+LEARNING_RATE = 1e-4
 
 
 def map_target_to_class(labels):
@@ -122,7 +122,7 @@ class CustomSegmentationDataset(Dataset):
         sigma = np.sqrt(variance)
         gaussian = np.random.normal(mean, sigma, image.shape)
         ## Comment the following line if you don't want to add noise to the image
-        image = image + gaussian
+        #image = image + gaussian
 
         image = (image - image.min()) / (image.max() - image.min())  # stretch it to include 0 and 1
         image = Image.fromarray((image * 255).astype(np.uint8))  # convert it back to
@@ -134,8 +134,8 @@ class CustomSegmentationDataset(Dataset):
     
 # Perform data augmentation (flipping and rotation) on the training set.
 transform_dummy_augmented = transforms.Compose(
-    [transforms.RandomHorizontalFlip(p=0.5), transforms.RandomVerticalFlip(p=0.5),
-     transforms.RandomRotation(degrees=90), transforms.ToTensor(), transforms.Resize((128, 128))
+    [transforms.RandomHorizontalFlip(p=0.10), transforms.RandomRotation(degrees=10), 
+     transforms.ToTensor(), transforms.Resize((128, 128))
      ])
 
 # Transform the data. Use padding to get 2^n x 2^n dimensional images. 

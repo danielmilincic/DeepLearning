@@ -11,6 +11,7 @@ import torch
 from UNet_3Plus import UNet_3Plus
 import torch.nn.functional as F
 from iouLoss import *
+import time
 
 
 # HYPERPARAMETERS
@@ -114,12 +115,12 @@ class CustomSegmentationDataset(Dataset):
         return image, label
 
     def apply_transform(self, image, label):
-        image = np.asarray(image) / (2 ** 16 - 1)  # scale it to [0,1]
-        mean = 0
-        variance = 0.1  # You can change this value
-        sigma = np.sqrt(variance)
-        gaussian = np.random.normal(mean, sigma, image.shape)
-        image = image + gaussian
+        image = np.asarray(image).astype(np.float32) / (2 ** 16 - 1)  # scale it to [0,1]
+        #mean = 0
+        #variance = 0.3  # You can change this value
+        #sigma = np.sqrt(variance)
+        #gaussian = np.random.normal(mean, sigma, image.shape)
+        #image = image + gaussian
 
         image = (image - image.min()) / (image.max() - image.min())  # stretch it to include 0 and 1
         image = Image.fromarray((image * 255).astype(np.uint8))  # convert it back to
@@ -164,6 +165,8 @@ model.train()
 train_accuracies = []
 valid_accuracies = []
 
+current_time = time.time()
+
 for epoch in range(NUM_EPOCHS):
     train_accuracies_batches = []
 
@@ -180,8 +183,8 @@ for epoch in range(NUM_EPOCHS):
         loss.backward()
         optimizer.step()
 
-        if step % 400 == 0:
-            plot_image_and_label_output(inputs, targets, step, torch.argmax(output, dim=1))
+        #if step % 400 == 0:
+            #plot_image_and_label_output(inputs, targets, step, torch.argmax(output, dim=1))
 
         # Increment step counter
         step += 1
@@ -216,4 +219,5 @@ for epoch in range(NUM_EPOCHS):
             print(f"Step {step:<5}   training accuracy: {train_accuracies[-1]}")
             print(f"             test accuracy: {valid_accuracies[-1]}")
 
-print("Finished training.")
+current_time = time.time() - current_time
+print(f"Finished training. Took {current_time/60} min")

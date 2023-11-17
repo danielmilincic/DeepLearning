@@ -19,6 +19,7 @@ BATCH_SIZE = 16
 NUM_EPOCHS = 8
 VAL_EVERY_STEPS = 1
 LEARNING_RATE = 1e-4
+TESTING = False
 
 
 def map_target_to_class(labels):
@@ -226,24 +227,24 @@ for epoch in range(NUM_EPOCHS):
             print(f"             validation accuracy: {valid_accuracies[-1]}")
 
 
-## Comment the following lines if you are still tuning your model.
+if TESTING:
 
-# Test the mode after training and validation (model tuning) are done.
-test_accuracies_batches = []
-with torch.no_grad():
-    model.eval()
-    for inputs, targets in test_dataloader:
-        inputs, targets = inputs.to(device), targets.to(device)
-        targets = map_target_to_class(targets)
-        output = model(inputs)
-        loss = loss_fn(output, targets)
+    # Test the mode after training and validation (model tuning) are done.
+    test_accuracies_batches = []
+    with torch.no_grad():
+        model.eval()
+        for inputs, targets in test_dataloader:
+            inputs, targets = inputs.to(device), targets.to(device)
+            targets = map_target_to_class(targets)
+            output = model(inputs)
+            loss = loss_fn(output, targets)
 
-        # Multiply by len(x) because the final batch of DataLoader may be smaller (drop_last=False).
-        test_accuracies_batches.append(accuracy(targets, output) * len(inputs))
+            # Multiply by len(x) because the final batch of DataLoader may be smaller (drop_last=False).
+            test_accuracies_batches.append(accuracy(targets, output) * len(inputs))
 
-# Calculate average test accuracy
-test_accuracy = np.sum(test_accuracies_batches) / len(test_data)
-print(f"Test accuracy: {test_accuracy}")
+    # Calculate average test accuracy
+    test_accuracy = np.sum(test_accuracies_batches) / len(test_data)
+    print(f"Test accuracy: {test_accuracy}")
 
 
 print("Finished training.")

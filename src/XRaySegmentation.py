@@ -140,7 +140,7 @@ class CustomSegmentationDataset(Dataset):
         return image, label
 
     def apply_transform(self, image, label):
-        image = (np.asarray(image) / (2 ** 8 -1)).astype(np.uint8)  # scale it to [0,255]
+        image = (np.asarray(image) / (2 ** 8 + 1)).astype(np.uint8)  # scale it to [0,255]
 
         # Add Gaussian noise to the image
         mean = 0

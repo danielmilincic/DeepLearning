@@ -4,7 +4,7 @@ import numpy as np
 from sklearn import metrics
 from torchvision import transforms
 from torch.utils.data import Dataset, random_split, DataLoader
-from PIL import Image
+from PIL import Image, ImageOps
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 import torch
@@ -14,9 +14,13 @@ from dice_loss import *
 import dice_loss as dl
 import random
 import time
+import torchvision.transforms.functional as TF
 
 
 # HYPERPARAMETERS
+
+# Augmented data generator
+GENERATION = False
 
 # Resize the images to a square of size RESIZE_TO x RESIZE_TO
 RESIZE_TO = 128
@@ -35,6 +39,57 @@ FLIPPING_PROBABILITY = 0.0
 
 # Set to True to test the model after training and validation are done.
 TESTING = False
+
+
+# Generate augmented data and save it to the disk
+if GENERATION:
+
+    # Create transforms
+    rotate = transforms.RandomRotation(ROTATION_ANGLE)
+    hflip = transforms.RandomHorizontalFlip(FLIPPING_PROBABILITY) 
+    vflip = transforms.RandomVerticalFlip(FLIPPING_PROBABILITY)  
+
+    step = 1
+    # Iterate over all images and labels
+    while step < 501:
+
+        if step < 10:
+            step_data = f"000{step}"
+            step_label = f"00{step}"
+        elif step < 100:
+            step_data = f"00{step}"
+            step_label = f"0{step}" 
+        else:
+            step_data = f"0{step}"
+            step_label = f"{step}"  
+
+        image = Image.open(f"data/SOCprist{step_data}.tiff")
+        label = Image.open(f"labels/slice__{step_label}.tif")
+
+        # Horizontal flip
+        hflip_image = ImageOps.mirror(image)
+        hflip_label = ImageOps.mirror(label)
+        hflip_image.save(f"new_data/hflip_{step}.png")
+        hflip_label.save(f"new_labels/hflip_{step}.png")
+
+        # Vertical flip
+        vflip_image = ImageOps.flip(image)
+        vflip_label = ImageOps.flip(label)
+        vflip_image.save(f"new_data/vflip_{step}.png")
+        vflip_label.save(f"new_labels/vflip_{step}.png")
+
+        # Rotation
+        rotate_image = image.rotate(ROTATION_ANGLE)
+        rotate_label = label.rotate(ROTATION_ANGLE)
+        rotate_image.save(f"new_data/rotated_{step}.png")
+        rotate_label.save(f"new_labels/rotated_{step}.png")
+
+        # Original image and label
+        image.save(f"new_data/image_{step}.png")
+        label.save(f"new_labels/image_{step}.png")
+
+        print(f"Step {step} done")
+        step += 1
 
 
 def map_target_to_class(labels):
@@ -257,7 +312,7 @@ for epoch in range(NUM_EPOCHS):
                     targets = map_target_to_class(targets)
                     output = model(inputs)
                     # save the last image and label of the validation set
-                    plot_image_and_label_output(inputs[0], targets[0], step,  torch.argmax(output[0], dim=1), name="val")
+                    #plot_image_and_label_output(inputs[0], targets[0], step,  torch.argmax(output[0], dim=1), name="val")
                     loss = loss_fn(output, targets)
 
                     # Multiply by len(x) because the final batch of DataLoader may be smaller (drop_last=False).

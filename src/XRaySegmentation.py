@@ -257,7 +257,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model = UNet_3Plus(in_channels=1, n_classes=3).to(device)
 # Use CrossEntropyLoss: Changes the putput of UNet3Plus from softmax to logits
 
-loss_fn = torch.nn.CrossEntropyLoss()
+loss_fn = DiceLoss()
 
 optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 

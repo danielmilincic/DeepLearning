@@ -12,6 +12,7 @@ from UNet_3Plus import UNet_3Plus
 import torch.nn.functional as F
 from iouLoss import *
 import random
+import time
 
 
 # HYPERPARAMETERS
@@ -69,6 +70,29 @@ def plot_image_and_label_output(image, label, step,  output=None, name="example_
         axs[2].set_title("Output")
         axs[2].axis('off')
     plt.savefig(f"img/{name}_{step}.png")
+
+
+def plot_train_val_loss_and_accuarcy(train_loss, val_loss, train_acc, val_acc):
+    epochs = range(1, len(train_acc) + 1)
+    plt.figure(figsize=(12, 5))
+    plt.subplot(1, 2, 1)
+    plt.plot(epochs, train_acc, 'b-', label='Training Accuracy')
+    plt.plot(epochs, val_acc, 'r-', label='Validation Accuracy')
+    plt.title('Training and Validation Accuracy')
+    plt.xlabel('Epochs')
+    plt.ylabel('Accuracy')
+    plt.legend()
+
+    plt.subplot(1, 2, 2)
+    plt.plot(epochs, train_loss, 'b-', label='Training Loss')
+    plt.plot(epochs, val_loss, 'r-', label='Validation Loss')
+    plt.title('Training and Validation Loss')
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss')
+    plt.legend()
+
+    plt.tight_layout()
+    plt.savefig("img/overfitting.png")
 
 
 def get_image_files(data_path):
@@ -152,7 +176,6 @@ transform_dummy = transforms.Compose(
 # Split the data into train, validation, and test sets Load the test and train set into a dataloader.
 dataset = CustomSegmentationDataset(image_dir="data/", mask_dir="labels/", transform=transform_dummy_augmented)
 random_seed = torch.Generator().manual_seed(random.randint(0, 10000))
-
 train_data, test_data, val_data = random_split(dataset, [0.7, 0.1, 0.2], random_seed)
 
 train_dataloader = DataLoader(train_data, shuffle=True, batch_size=BATCH_SIZE)
@@ -173,9 +196,14 @@ model.train()
 
 train_accuracies = []
 valid_accuracies = []
+train_losses = []
+valid_losses = []
+
+current_time = time.time()
 
 for epoch in range(NUM_EPOCHS):
     train_accuracies_batches = []
+    train_losses_batches = []
 
     for inputs, targets in train_dataloader:
         model.train()
@@ -190,23 +218,24 @@ for epoch in range(NUM_EPOCHS):
         loss.backward()
         optimizer.step()
 
-        if step % 400 == 0:
-            # Plot the first image and label in the batch every 400 steps.
-            plot_image_and_label_output(inputs[0], targets[0], step, torch.argmax(output[0], dim=1))
         # Increment step counter
         step += 1
 
         train_accuracies_batches.append(accuracy(targets, output))
+        train_losses_batches.append(loss.item())
 
         if step % VAL_EVERY_STEPS == 0:
 
             # Append average training accuracy to list.
             train_accuracies.append(np.mean(train_accuracies_batches))
+            train_losses.append(np.mean(train_losses_batches))
 
             train_accuracies_batches = []
+            train_losses_batches = []
 
             # Compute accuracies on validation set.
             valid_accuracies_batches = []
+            valid_losses_batches = []
             with torch.no_grad():
                 model.eval()
                 for inputs, targets in val_dataloader:
@@ -218,10 +247,12 @@ for epoch in range(NUM_EPOCHS):
 
                     # Multiply by len(x) because the final batch of DataLoader may be smaller (drop_last=False).
                     valid_accuracies_batches.append(accuracy(targets, output) * len(inputs))
+                    valid_losses_batches.append(loss.item())
                 model.train()
 
             # Append average validation accuracy to list.
             valid_accuracies.append(np.sum(valid_accuracies_batches) / len(val_data))
+            valid_losses.append(np.sum(valid_losses_batches) / len(val_data))
 
             print(f"Step {step:<5}   training accuracy: {train_accuracies[-1]}")
             print(f"             validation accuracy: {valid_accuracies[-1]}")
@@ -247,4 +278,6 @@ if TESTING:
     print(f"Test accuracy: {test_accuracy}")
 
 
-print("Finished training.")
+current_time = time.time() - current_time
+print(f"Finished training. Took {current_time/60} min")
+plot_train_val_loss_and_accuarcy(train_losses, valid_losses, train_accuracies, valid_accuracies)

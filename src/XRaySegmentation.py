@@ -13,7 +13,7 @@ import torch.nn.functional as F
 from dice_loss import *
 import dice_loss as dl
 import random
-import time
+
 
 
 # HYPERPARAMETERS
@@ -200,7 +200,9 @@ print("Creating Model ")
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model = UNet_3Plus(in_channels=1, n_classes=3).to(device)
 # Use CrossEntropyLoss: Changes the putput of UNet3Plus from softmax to logits
+
 loss_fn = torch.nn.CrossEntropyLoss()
+
 optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
 step = 0
@@ -211,7 +213,7 @@ valid_accuracies = []
 train_losses = []
 valid_losses = []
 
-current_time = time.time()
+#current_time = time.time()
 
 for epoch in range(NUM_EPOCHS):
     train_accuracies_batches = []
@@ -269,6 +271,7 @@ for epoch in range(NUM_EPOCHS):
 
             print(f"Step {step:<5}   training accuracy: {train_accuracies[-1]}")
             print(f"             validation accuracy: {valid_accuracies[-1]}")
+            print(f"             dice loss over the three classes: {loss}")
 
 
 if TESTING:
@@ -291,6 +294,6 @@ if TESTING:
     print(f"Test accuracy: {test_accuracy}")
 
 
-current_time = time.time() - current_time
-print(f"Finished training. Took {current_time/60} min")
+#current_time = time.time() - current_time
+#print(f"Finished training. Took {current_time/60} min")
 plot_train_val_loss_and_accuarcy(train_losses, valid_losses, train_accuracies, valid_accuracies)

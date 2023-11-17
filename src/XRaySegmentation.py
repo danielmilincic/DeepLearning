@@ -190,7 +190,7 @@ model = UNet_3Plus(in_channels=1, n_classes=3).to(device)
 # Use CrossEntropyLoss: Changes the putput of UNet3Plus from softmax to logits
 
 # Use DiceLoss, based on the concept of IoU
-loss_fn = dl.DiceLoss()
+loss_fn = torch.nn.CrossEntropyLoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
 step = 0
@@ -213,7 +213,7 @@ for epoch in range(NUM_EPOCHS):
 
         targets = map_target_to_class(targets)
         output = model(inputs)
-        loss = loss_fn(output, targets)
+        loss = F.C(output, targets)
         # if step % VAL_EVERY_STEPS == 0:
         #    print(f"loss = {loss}")
         optimizer.zero_grad()

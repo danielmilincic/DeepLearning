@@ -12,14 +12,27 @@ from UNet_3Plus import UNet_3Plus
 import torch.nn.functional as F
 from dice_loss import *
 import dice_loss as dl
-
+import random
+import time
 
 # HYPERPARAMETERS
-BATCH_SIZE = 8 # batch_size: num_steps_per_epoch => 8:44 16:22 32:11
+
+# Resize the images to a square of size RESIZE_TO x RESIZE_TO
+RESIZE_TO = 128
+
+# Training parameters
+BATCH_SIZE = 8      # batch_size : num_steps_per_epoch => 8:44 16:22 32:11
 NUM_EPOCHS = 20
 VAL_EVERY_STEPS = 10
 LEARNING_RATE = 1e-4
+
+# Add Gaussian noise to the images
 NOISE = False
+# Add rotation and flipping to the images
+ROTATION_ANGLE = 0
+FLIPPING_PROBABILITY = 0.0
+
+# Set to True to test the model after training and validation are done.
 TESTING = False
 
 
@@ -159,18 +172,13 @@ class CustomSegmentationDataset(Dataset):
     
 # Perform data augmentation (flipping and rotation) on the training set.
 transform_dummy_augmented = transforms.Compose(
-    [transforms.RandomHorizontalFlip(p=0.05), transforms.RandomRotation(degrees=5), 
-     transforms.ToTensor(), transforms.Resize((128, 128))
+    [transforms.RandomHorizontalFlip(p=FLIPPING_PROBABILITY), transforms.RandomRotation(degrees=ROTATION_ANGLE), 
+     transforms.ToTensor(), transforms.Resize((RESIZE_TO, RESIZE_TO))
      ])
 
 # Transform the data. Use padding to get 2^n x 2^n dimensional images. 
 transform = transforms.Compose(
     [transforms.ToTensor(), transforms.Pad((6, 6, 5, 5), padding_mode="edge")
-     ])
-
-# Transform the data. Use transform_dummy to check the model functionality.
-transform_dummy = transforms.Compose(
-    [transforms.ToTensor(), transforms.Resize((128, 128))
      ])
 
 # Split the data into train, validation, and test sets Load the test and train set into a dataloader.

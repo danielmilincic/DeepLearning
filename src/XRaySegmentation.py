@@ -257,7 +257,7 @@ for epoch in range(NUM_EPOCHS):
                     targets = map_target_to_class(targets)
                     output = model(inputs)
                     # save the last image and label of the validation set
-                    plot_image_and_label_output(inputs[0], targets[0], step,  torch.argmax(output[0], dim=1), name="val")
+                    # plot_image_and_label_output(inputs[0], targets[0], step,  torch.argmax(output[0], dim=1), name="val")
                     loss = loss_fn(output, targets)
 
                     # Multiply by len(x) because the final batch of DataLoader may be smaller (drop_last=False).

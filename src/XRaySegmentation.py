@@ -138,7 +138,7 @@ class CustomSegmentationDataset(Dataset):
         return image, label
 
     def apply_transform(self, image, label):
-        image = np.asarray(image).astype(np.float32) / (2 ** 16 - 1)  # scale it to [0,1]
+        image = (np.asarray(image)/ (2 ** 16 - 1)).astype(np.float32)   # scale it to [0,1]
         #mean = 0
         #variance = 0.3  # You can change this value
         #sigma = np.sqrt(variance)

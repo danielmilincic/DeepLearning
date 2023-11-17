@@ -10,9 +10,8 @@ from sklearn.model_selection import train_test_split
 import torch
 from UNet_3Plus import UNet_3Plus
 import torch.nn.functional as F
-from iouLoss import *
-import random
-import time
+from dice_loss import *
+import dice_loss as dl
 
 
 # HYPERPARAMETERS
@@ -188,8 +187,9 @@ print("Creating Model ")
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model = UNet_3Plus(in_channels=1, n_classes=3).to(device)
 # Use CrossEntropyLoss: Changes the putput of UNet3Plus from softmax to logits
-loss_fn = torch.nn.CrossEntropyLoss()
 
+# Use DiceLoss, based on the concept of IoU
+loss_fn = dl.DiceLoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
 step = 0

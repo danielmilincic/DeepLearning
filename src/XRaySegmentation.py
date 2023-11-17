@@ -23,12 +23,12 @@ RESIZE_TO = 128
 
 # Training parameters
 BATCH_SIZE = 8      # batch_size : num_steps_per_epoch => 8:44 16:22 32:11
-NUM_EPOCHS = 20
+NUM_EPOCHS = 1
 VAL_EVERY_STEPS = 10
 LEARNING_RATE = 1e-4
 
 # Add Gaussian noise to the images
-NOISE = False
+NOISE = True
 # Add rotation and flipping to the images
 ROTATION_ANGLE = 0
 FLIPPING_PROBABILITY = 0.0
@@ -158,7 +158,7 @@ class CustomSegmentationDataset(Dataset):
         # Add Gaussian noise to the image
         if NOISE:
             mean = 0
-            variance = 0.1  # You can change this value
+            variance = 256 # You can change this value
             sigma = np.sqrt(variance)
             gaussian = np.random.normal(mean, sigma, image.shape)
             image = image + gaussian
@@ -171,26 +171,29 @@ class CustomSegmentationDataset(Dataset):
         label = self.transform(label)
 
         return image, label
-    
-# Perform data augmentation (flipping and rotation) on the training set.
-transform_dummy_augmented = transforms.Compose(
-    [transforms.RandomHorizontalFlip(p=FLIPPING_PROBABILITY), transforms.RandomRotation(degrees=ROTATION_ANGLE), 
-     transforms.ToTensor(), transforms.Resize((RESIZE_TO, RESIZE_TO))
-     ])
 
-# Transform the data. Use padding to get 2^n x 2^n dimensional images. 
-transform = transforms.Compose(
+# Resize the training and validation set (501x501 -> 128x128)
+transform_resized_train_val = transforms.Compose(
+    [transforms.ToTensor(), transforms.Resize((RESIZE_TO, RESIZE_TO))])
+
+# Add padding to the test set (501x501 -> 512x512)
+transform_original_padded = transforms.Compose(
     [transforms.ToTensor(), transforms.Pad((6, 6, 5, 5), padding_mode="edge")
      ])
 
-# Split the data into train, validation, and test sets Load the test and train set into a dataloader.
-dataset = CustomSegmentationDataset(image_dir="data/", mask_dir="labels/", transform=transform_dummy_augmented)
-random_seed = torch.Generator().manual_seed(random.randint(0, 10000))
-train_data, test_data, val_data = random_split(dataset, [0.7, 0.1, 0.2], random_seed)
+# Create datasets
+dataset_train_val = CustomSegmentationDataset(image_dir="data/", mask_dir="labels/", transform=transform_resized_train_val)
+dataset_test = CustomSegmentationDataset(image_dir="data/", mask_dir="labels/", transform=transform_original_padded)
 
+# Split the first dataset into training and validation set
+random_seed = torch.Generator().manual_seed(random.randint(0, 10000))
+train_data, val_data = random_split(dataset_train_val, [0.75, 0.25], random_seed)
 train_dataloader = DataLoader(train_data, shuffle=True, batch_size=BATCH_SIZE)
-test_dataloader = DataLoader(test_data, shuffle=False, batch_size=BATCH_SIZE)
 val_dataloader = DataLoader(val_data, shuffle=False, batch_size=BATCH_SIZE)
+
+# Create test dataloader
+test_data = dataset_test
+test_dataloader = DataLoader(test_data, shuffle=False, batch_size=BATCH_SIZE)
 
 # Create model
 print("Creating Model ")
@@ -253,7 +256,8 @@ for epoch in range(NUM_EPOCHS):
                     inputs, targets = inputs.to(device), targets.to(device)
                     targets = map_target_to_class(targets)
                     output = model(inputs)
-                    #plot_image_and_label_output(inputs, targets, step,  torch.argmax(output, dim=1), name="val")
+                    # save the last image and label of the validation set
+                    plot_image_and_label_output(inputs[0], targets[0], step,  torch.argmax(output[0], dim=1), name="val")
                     loss = loss_fn(output, targets)
 
                     # Multiply by len(x) because the final batch of DataLoader may be smaller (drop_last=False).

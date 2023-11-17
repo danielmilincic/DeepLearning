@@ -12,6 +12,8 @@ from UNet_3Plus import UNet_3Plus
 import torch.nn.functional as F
 from dice_loss import *
 import dice_loss as dl
+import random
+import time
 
 
 # HYPERPARAMETERS
@@ -138,7 +140,7 @@ class CustomSegmentationDataset(Dataset):
         return image, label
 
     def apply_transform(self, image, label):
-        image = np.asarray(image) / (2 ** 16 - 1)  # scale it to [0,1]
+        image = (np.asarray(image) / (2 ** 8 -1)).astype(np.uint8)  # scale it to [0,255]
 
         # Add Gaussian noise to the image
         mean = 0
@@ -147,9 +149,9 @@ class CustomSegmentationDataset(Dataset):
         gaussian = np.random.normal(mean, sigma, image.shape)
         ## Comment the following line if you don't want to add noise to the image
         #image = image + gaussian
-
-        image = (image - image.min()) / (image.max() - image.min())  # stretch it to include 0 and 1
-        image = Image.fromarray((image * 255).astype(np.uint8))  # convert it back to
+        image[image < 0] = 0
+        image[image > 255] = 255
+        image = Image.fromarray(image)
 
         image = self.transform(image)
         label = self.transform(label)

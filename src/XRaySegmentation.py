@@ -16,10 +16,11 @@ import time
 
 
 # HYPERPARAMETERS
-BATCH_SIZE = 16
-NUM_EPOCHS = 8
-VAL_EVERY_STEPS = 1
+BATCH_SIZE = 8 # batch_size: num_steps_per_epoch => 8:44 16:22 32:11
+NUM_EPOCHS = 20
+VAL_EVERY_STEPS = 10
 LEARNING_RATE = 1e-4
+NOISE = False
 TESTING = False
 
 
@@ -142,12 +143,12 @@ class CustomSegmentationDataset(Dataset):
         image = np.asarray(image) / (2 ** 16 - 1)  # scale it to [0,1]
 
         # Add Gaussian noise to the image
-        mean = 0
-        variance = 0.1  # You can change this value
-        sigma = np.sqrt(variance)
-        gaussian = np.random.normal(mean, sigma, image.shape)
-        ## Comment the following line if you don't want to add noise to the image
-        #image = image + gaussian
+        if NOISE:
+            mean = 0
+            variance = 0.1  # You can change this value
+            sigma = np.sqrt(variance)
+            gaussian = np.random.normal(mean, sigma, image.shape)
+            image = image + gaussian
 
         image = (image - image.min()) / (image.max() - image.min())  # stretch it to include 0 and 1
         image = Image.fromarray((image * 255).astype(np.uint8))  # convert it back to
@@ -159,7 +160,7 @@ class CustomSegmentationDataset(Dataset):
     
 # Perform data augmentation (flipping and rotation) on the training set.
 transform_dummy_augmented = transforms.Compose(
-    [transforms.RandomHorizontalFlip(p=0.10), transforms.RandomRotation(degrees=10), 
+    [transforms.RandomHorizontalFlip(p=0.05), transforms.RandomRotation(degrees=5), 
      transforms.ToTensor(), transforms.Resize((128, 128))
      ])
 

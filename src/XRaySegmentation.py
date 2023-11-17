@@ -19,7 +19,7 @@ import torchvision.transforms.functional as TF
 
 # HYPERPARAMETERS
 
-# Augmented data generator
+# DO NOT CHANGE THIS TO TRUE UNLESS YOU WANT TO GENERATE NEW DATASET FROM SCRATCH
 GENERATION = False
 
 # Resize the images to a square of size RESIZE_TO x RESIZE_TO

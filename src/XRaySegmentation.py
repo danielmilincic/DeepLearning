@@ -101,7 +101,7 @@ def map_target_to_class(labels):
     return torch.round(labels * 2).squeeze(1).long()
 
 
-def accuracy(target, pred):
+def accuracy2(target, pred):
     """
     :param target: Ground truth.
     :param pred: Output of our model.
@@ -111,6 +111,22 @@ def accuracy(target, pred):
     target = target.detach().cpu().numpy()
     matches = np.sum(target == map_pred.detach().cpu().numpy())
     return matches / target.size
+
+def iou_single_class(preds, labels, class_idx):
+    class_pred = (preds == class_idx)
+    print(f"class_pred = {class_pred.shape}")
+    class_label = (labels == class_idx)
+    print(f"class_label = {class_label.shape}")
+    intersection = torch.logical_and(class_pred, class_label).sum()
+    union = torch.logical_or(class_pred, class_label).sum()
+
+    iou = intersection / union if union != 0 else torch.tensor(0.0)
+    return iou
+
+def accuracy(preds, labels, num_classes = 3):
+    ious = [iou_single_class(preds, labels, class_idx) for class_idx in range(num_classes)]
+    mean_iou = sum(ious) / num_classes
+    return mean_iou
 
 
 def plot_image_and_label_output(image, label, step,  output=None, name="example_output"):

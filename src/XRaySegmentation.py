@@ -19,6 +19,7 @@ BATCH_SIZE = 1 # statistical gradient
 NUM_EPOCHS = 4
 VAL_EVERY_STEPS = 1
 LEARNING_RATE = 1e-4
+TESTING = False
 
 
 def map_target_to_class(labels):
@@ -70,9 +71,31 @@ def plot_image_and_label_output(image, label, step,  output=None, name="example_
     plt.savefig(f"img/{name}_{step}.png")
 
 
+def plot_train_val_loss_and_accuarcy(train_loss, val_loss, train_acc, val_acc):
+    epochs = range(1, len(train_acc) + 1)
+    plt.figure(figsize=(12, 5))
+    plt.subplot(1, 2, 1)
+    plt.plot(epochs, train_acc, 'b-', label='Training Accuracy')
+    plt.plot(epochs, val_acc, 'r-', label='Validation Accuracy')
+    plt.title('Training and Validation Accuracy')
+    plt.xlabel('Epochs')
+    plt.ylabel('Accuracy')
+    plt.legend()
+
+    plt.subplot(1, 2, 2)
+    plt.plot(epochs, train_loss, 'b-', label='Training Loss')
+    plt.plot(epochs, val_loss, 'r-', label='Validation Loss')
+    plt.title('Training and Validation Loss')
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss')
+    plt.legend()
+
+    plt.tight_layout()
+    plt.savefig("img/overfitting.png")
+
+
 def get_image_files(data_path):
     return sorted(os.listdir(data_path))
-
 
 def load_images_from_directory(directory):
     images = []
@@ -116,6 +139,15 @@ class CustomSegmentationDataset(Dataset):
 
     def apply_transform(self, image, label):
         image = np.asarray(image) / (2 ** 16 - 1)  # scale it to [0,1]
+
+        # Add Gaussian noise to the image
+        mean = 0
+        variance = 0.1  # You can change this value
+        sigma = np.sqrt(variance)
+        gaussian = np.random.normal(mean, sigma, image.shape)
+        ## Comment the following line if you don't want to add noise to the image
+        #image = image + gaussian
+
         image = (image - image.min()) / (image.max() - image.min())  # stretch it to include 0 and 1
         image = Image.fromarray((image * 255).astype(np.uint8))  # convert it back to
 
@@ -123,24 +155,29 @@ class CustomSegmentationDataset(Dataset):
         label = self.transform(label)
 
         return image, label
+    
+# Perform data augmentation (flipping and rotation) on the training set.
+transform_dummy_augmented = transforms.Compose(
+    [transforms.RandomHorizontalFlip(p=0.10), transforms.RandomRotation(degrees=10), 
+     transforms.ToTensor(), transforms.Resize((128, 128))
+     ])
 
-
-# Transform the data. Use transform_dummy to check the model functionality.
+# Transform the data. Use padding to get 2^n x 2^n dimensional images. 
 transform = transforms.Compose(
     [transforms.ToTensor(), transforms.Pad((6, 6, 5, 5), padding_mode="edge")
      ])
 
-# Transform the data. Use padding to get 2^n x 2^n dimensional images.
+# Transform the data. Use transform_dummy to check the model functionality.
 transform_dummy = transforms.Compose(
-    [transforms.ToTensor(), transforms.Resize((64, 64))
+    [transforms.ToTensor(), transforms.Resize((128, 128))
      ])
 
 # Split the data into train, validation, and test sets Load the test and train set into a dataloader.
-dataset = CustomSegmentationDataset(image_dir="data/", mask_dir="labels/", transform=transform)
-random_seed = torch.Generator().manual_seed(80)
-train_data, test_data, val_data = random_split(dataset, [0.8, 0.1, 0.1], random_seed)
+dataset = CustomSegmentationDataset(image_dir="data/", mask_dir="labels/", transform=transform_dummy_augmented)
+random_seed = torch.Generator().manual_seed(random.randint(0, 10000))
+train_data, test_data, val_data = random_split(dataset, [0.7, 0.1, 0.2], random_seed)
 
-train_dataloader = DataLoader(train_data, shuffle=False, batch_size=BATCH_SIZE)
+train_dataloader = DataLoader(train_data, shuffle=True, batch_size=BATCH_SIZE)
 test_dataloader = DataLoader(test_data, shuffle=False, batch_size=BATCH_SIZE)
 val_dataloader = DataLoader(val_data, shuffle=False, batch_size=BATCH_SIZE)
 
@@ -159,9 +196,14 @@ model.train()
 
 train_accuracies = []
 valid_accuracies = []
+train_losses = []
+valid_losses = []
+
+current_time = time.time()
 
 for epoch in range(NUM_EPOCHS):
     train_accuracies_batches = []
+    train_losses_batches = []
 
     for inputs, targets in train_dataloader:
         model.train()
@@ -176,23 +218,24 @@ for epoch in range(NUM_EPOCHS):
         loss.backward()
         optimizer.step()
 
-        #if step % 400 == 0:
-        #    plot_image_and_label_output(inputs, targets, step, torch.argmax(output, dim=1))
-
         # Increment step counter
         step += 1
 
         train_accuracies_batches.append(accuracy(targets, output))
+        train_losses_batches.append(loss.item())
 
         if step % VAL_EVERY_STEPS == 0:
 
             # Append average training accuracy to list.
             train_accuracies.append(np.mean(train_accuracies_batches))
+            train_losses.append(np.mean(train_losses_batches))
 
             train_accuracies_batches = []
+            train_losses_batches = []
 
             # Compute accuracies on validation set.
             valid_accuracies_batches = []
+            valid_losses_batches = []
             with torch.no_grad():
                 model.eval()
                 for inputs, targets in val_dataloader:
@@ -204,12 +247,37 @@ for epoch in range(NUM_EPOCHS):
 
                     # Multiply by len(x) because the final batch of DataLoader may be smaller (drop_last=False).
                     valid_accuracies_batches.append(accuracy(targets, output) * len(inputs))
+                    valid_losses_batches.append(loss.item())
                 model.train()
 
             # Append average validation accuracy to list.
             valid_accuracies.append(np.sum(valid_accuracies_batches) / len(val_data))
+            valid_losses.append(np.sum(valid_losses_batches) / len(val_data))
 
             print(f"Step {step:<5}   training accuracy: {train_accuracies[-1]}")
-            print(f"             test accuracy: {valid_accuracies[-1]}")
+            print(f"             validation accuracy: {valid_accuracies[-1]}")
 
-print("Finished training.")
+
+if TESTING:
+
+    # Test the mode after training and validation (model tuning) are done.
+    test_accuracies_batches = []
+    with torch.no_grad():
+        model.eval()
+        for inputs, targets in test_dataloader:
+            inputs, targets = inputs.to(device), targets.to(device)
+            targets = map_target_to_class(targets)
+            output = model(inputs)
+            loss = loss_fn(output, targets)
+
+            # Multiply by len(x) because the final batch of DataLoader may be smaller (drop_last=False).
+            test_accuracies_batches.append(accuracy(targets, output) * len(inputs))
+
+    # Calculate average test accuracy
+    test_accuracy = np.sum(test_accuracies_batches) / len(test_data)
+    print(f"Test accuracy: {test_accuracy}")
+
+
+current_time = time.time() - current_time
+print(f"Finished training. Took {current_time/60} min")
+plot_train_val_loss_and_accuarcy(train_losses, valid_losses, train_accuracies, valid_accuracies)

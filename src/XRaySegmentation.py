@@ -113,14 +113,12 @@ def accuracy2(target, pred):
     return matches / target.size
 
 def iou_single_class(preds, labels, class_idx):
-    class_pred = (torch.argmax(preds, dim=1) == class_idx)
-    print(f"class_pred = {class_pred.shape}")
-    class_label = (labels == class_idx)
-    print(f"class_label = {class_label.shape}")
-    intersection = torch.logical_and(class_pred, class_label).sum()
-    union = torch.logical_or(class_pred, class_label).sum()
+    class_pred = (torch.argmax(preds, dim=1) == class_idx).detach().cpu().numpy()
+    class_label = (labels == class_idx).detach().cpu().numpy()
+    intersection = np.logical_and(class_pred, class_label).sum()
+    union = np.logical_and(class_pred, class_label).sum()
 
-    iou = intersection / union if union != 0 else torch.tensor(0.0)
+    iou = intersection / union if union != 0 else 0
     return iou
 
 def accuracy(labels, preds, num_classes = 3):

@@ -17,10 +17,23 @@ import time
 
 
 # HYPERPARAMETERS
-BATCH_SIZE = 1 # statistical gradient
-NUM_EPOCHS = 4
-VAL_EVERY_STEPS = 1
+
+# Resize the images to a square of size RESIZE_TO x RESIZE_TO
+RESIZE_TO = 128
+
+# Training parameters
+BATCH_SIZE = 8      # batch_size : num_steps_per_epoch => 8:44 16:22 32:11
+NUM_EPOCHS = 20
+VAL_EVERY_STEPS = 10
 LEARNING_RATE = 1e-4
+
+# Add Gaussian noise to the images
+NOISE = False
+# Add rotation and flipping to the images
+ROTATION_ANGLE = 0
+FLIPPING_PROBABILITY = 0.0
+
+# Set to True to test the model after training and validation are done.
 TESTING = False
 
 
@@ -143,12 +156,13 @@ class CustomSegmentationDataset(Dataset):
         image = (np.asarray(image) / (2 ** 8 + 1)).astype(np.uint8)  # scale it to [0,255]
 
         # Add Gaussian noise to the image
-        mean = 0
-        variance = 0.1  # You can change this value
-        sigma = np.sqrt(variance)
-        gaussian = np.random.normal(mean, sigma, image.shape)
-        ## Comment the following line if you don't want to add noise to the image
-        #image = image + gaussian
+        if NOISE:
+            mean = 0
+            variance = 0.1  # You can change this value
+            sigma = np.sqrt(variance)
+            gaussian = np.random.normal(mean, sigma, image.shape)
+            image = image + gaussian
+
         image[image < 0] = 0
         image[image > 255] = 255
         image = Image.fromarray(image)
@@ -160,18 +174,13 @@ class CustomSegmentationDataset(Dataset):
     
 # Perform data augmentation (flipping and rotation) on the training set.
 transform_dummy_augmented = transforms.Compose(
-    [transforms.RandomHorizontalFlip(p=0.10), transforms.RandomRotation(degrees=10), 
-     transforms.ToTensor(), transforms.Resize((128, 128))
+    [transforms.RandomHorizontalFlip(p=FLIPPING_PROBABILITY), transforms.RandomRotation(degrees=ROTATION_ANGLE), 
+     transforms.ToTensor(), transforms.Resize((RESIZE_TO, RESIZE_TO))
      ])
 
 # Transform the data. Use padding to get 2^n x 2^n dimensional images. 
 transform = transforms.Compose(
     [transforms.ToTensor(), transforms.Pad((6, 6, 5, 5), padding_mode="edge")
-     ])
-
-# Transform the data. Use transform_dummy to check the model functionality.
-transform_dummy = transforms.Compose(
-    [transforms.ToTensor(), transforms.Resize((128, 128))
      ])
 
 # Split the data into train, validation, and test sets Load the test and train set into a dataloader.

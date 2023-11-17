@@ -8,21 +8,34 @@ class DiceLoss(torch.nn.Module):
         self.smooth = smooth
 
     def forward(self, outputs, targets):
+        print(f"outputs before softmax : {outputs}")
         outputs = F.softmax(outputs, dim=1)  #  model outputs logits so we want to convert to probabilities
         # controlla logits
-
+        print(f"outputs after softmax : {outputs}")
+        general_mask = create_mask(outputs)
         dice_loss = 0
 
         for class_idx in range(self.num_classes):
-            output_class = outputs[:, class_idx, ...]
+            # output_class = general_mask
+            #print(f"output class : {output_class}")
+            print(f"targets : {targets}")
             target_class = (targets == class_idx).float()
-
-            intersection = torch.sum(output_class * target_class)
-            union = torch.sum(output_class) + torch.sum(target_class) + self.smooth
+            print(f"target class : {target_class}")
+            intersection = torch.sum(general_mask * target_class)
+            union = torch.sum(general_mask) + torch.sum(target_class) + self.smooth
 
             dice_loss += 1 - (2 * intersection + self.smooth) / union
 
         return dice_loss / self.num_classes
+
+
+def create_mask(outputs_soft):
+    # Find the index of the maximum value along the second dimension (dimension 1)
+    predicted_classes = torch.argmax(outputs_soft, dim=1, keepdim=True)
+
+    # Print the resulting tensor
+    print(predicted_classes)    
+    return predicted_classes
 
 """
 def _iou(pred, target, size_average = True):

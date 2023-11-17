@@ -22,7 +22,3 @@ class DiceLoss(torch.nn.Module):
             dice_loss += 1 - (2 * intersection + self.smooth) / (union + self.smooth)
 
         return dice_loss / self.num_classes
-
-# Example usage
-# dice_loss = DiceLoss(num_classes=3)
-# loss = dice_loss(outputs, targets)

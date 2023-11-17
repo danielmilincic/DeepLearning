@@ -28,7 +28,7 @@ RESIZE_TO = 128
 
 # Training parameters
 BATCH_SIZE = 8      # batch_size : num_steps_per_epoch => 8:44 16:22 32:11
-NUM_EPOCHS = 1
+NUM_EPOCHS = 2
 VAL_EVERY_STEPS = 10
 LEARNING_RATE = 1e-4
 

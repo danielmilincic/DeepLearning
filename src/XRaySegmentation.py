@@ -15,6 +15,7 @@ import dice_loss as dl
 import random
 import time
 
+
 # HYPERPARAMETERS
 
 # Resize the images to a square of size RESIZE_TO x RESIZE_TO
@@ -153,6 +154,7 @@ class CustomSegmentationDataset(Dataset):
 
     def apply_transform(self, image, label):
         image = (np.asarray(image) / (2 ** 8 + 1)).astype(np.uint8)  # scale it to [0,255]
+
         # Add Gaussian noise to the image
         if NOISE:
             mean = 0
@@ -164,7 +166,7 @@ class CustomSegmentationDataset(Dataset):
         image[image < 0] = 0
         image[image > 255] = 255
         image = Image.fromarray(image)
-        
+
         image = self.transform(image)
         label = self.transform(label)
 

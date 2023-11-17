@@ -225,7 +225,7 @@ for epoch in range(NUM_EPOCHS):
 
         targets = map_target_to_class(targets)
         output = model(inputs)
-        loss = F.C(output, targets)
+        loss = loss_fn(output, targets)
         # if step % VAL_EVERY_STEPS == 0:
         #    print(f"loss = {loss}")
         optimizer.zero_grad()

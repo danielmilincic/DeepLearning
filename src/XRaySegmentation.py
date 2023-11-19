@@ -33,9 +33,6 @@ LEARNING_RATE = 1e-4
 
 # Add Gaussian noise to the images
 NOISE = True
-# Add rotation and flipping to the images
-ROTATION_ANGLE = 0
-FLIPPING_PROBABILITY = 0.0
 
 # Set to True to test the model after training and validation are done.
 TESTING = False
@@ -43,10 +40,24 @@ TESTING = False
 # Generate augmented data and save it to the disk
 if GENERATION:
 
-    # Create transforms
-    rotate = transforms.RandomRotation(ROTATION_ANGLE)
-    hflip = transforms.RandomHorizontalFlip(FLIPPING_PROBABILITY)
-    vflip = transforms.RandomVerticalFlip(FLIPPING_PROBABILITY)
+    # Create directories for the new data and labels if they do not exist
+    if not os.path.exists("new_data"):
+        os.mkdir("new_data")
+        print("Created new_data directory")
+    else:
+        # Delete all files in the directory
+        for file in os.listdir("new_data"):
+            os.remove(f"new_data/{file}")
+        print("Deleted all files in new_data directory")
+
+    if not os.path.exists("new_labels"):
+        os.mkdir("new_labels")
+        print("Created new_labels directory")
+    else:
+        for file in os.listdir("new_labels"):
+            os.remove(f"new_labels/{file}")
+        print("Deleted all files in new_labels directory")
+
 
     step = 1
     # Iterate over all images and labels
@@ -76,12 +87,6 @@ if GENERATION:
         vflip_label = ImageOps.flip(label)
         vflip_image.save(f"new_data/vflip_{step}.png")
         vflip_label.save(f"new_labels/vflip_{step}.png")
-
-        # Rotation
-        rotate_image = image.rotate(ROTATION_ANGLE)
-        rotate_label = label.rotate(ROTATION_ANGLE)
-        rotate_image.save(f"new_data/rotated_{step}.png")
-        rotate_label.save(f"new_labels/rotated_{step}.png")
 
         # Original image and label
         image.save(f"new_data/image_{step}.png")
@@ -169,6 +174,9 @@ def plot_image_and_label_output(org_image, ground_truth, step, output=None, name
         axs[2].imshow(output, cmap="magma")
         axs[2].set_title("Output")
         axs[2].axis('off')
+    # create the directory if it does not exist
+    if not os.path.exists("img"):
+        os.mkdir("img")
     plt.savefig(f"img/{name}_{step}.png")
 
 
@@ -192,6 +200,9 @@ def plot_train_val_loss_and_accuracy(train_loss, val_loss, train_acc, val_acc):
     plt.legend()
 
     plt.tight_layout()
+    # create the directory if it does not exist
+    if not os.path.exists("img"):
+        os.mkdir("img")
     plt.savefig("img/overfitting.png")
 
 

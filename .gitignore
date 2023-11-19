@@ -4,3 +4,5 @@
 .vscode/
 __pycache__/
 /img/
+/new_data/
+/new_labels/

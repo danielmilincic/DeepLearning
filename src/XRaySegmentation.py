@@ -27,8 +27,8 @@ RESIZE_TO = 128
 
 # Training parameters
 BATCH_SIZE = 8  # batch_size : num_steps_per_epoch => 8:44 16:22 32:11
-NUM_EPOCHS = 2
-VAL_EVERY_STEPS = 10
+NUM_EPOCHS = 1
+VAL_EVERY_STEPS = 40
 LEARNING_RATE = 1e-4
 
 # Add Gaussian noise to the images
@@ -265,9 +265,9 @@ data = load_images_from_directory(data_directory)
 labels = load_images_from_directory(label_directory)
 
 # Create datasets
-dataset_train_val = CustomSegmentationDataset(image_dir="data/", mask_dir="labels/",
+dataset_train_val = CustomSegmentationDataset(image_dir=data_directory, mask_dir=label_directory,
                                               transform=transform_resized_train_val)
-dataset_test = CustomSegmentationDataset(image_dir="data/", mask_dir="labels/", transform=transform_original_padded)
+dataset_test = CustomSegmentationDataset(image_dir=data_directory, mask_dir=label_directory, transform=transform_original_padded)
 
 # Split the first dataset into training and validation set
 random_seed = torch.Generator().manual_seed(random.randint(0, 10000))

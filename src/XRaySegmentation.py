@@ -15,6 +15,7 @@ import dice_loss as dl
 import random
 import time
 import torchvision.transforms.functional as TF
+import segmentation_models_pytorch as smp
 
 
 
@@ -101,28 +102,40 @@ def map_target_to_class(labels):
     return torch.round(labels * 2).squeeze(1).long()
 
 
-def accuracy2(target, pred):
+def pixelwise_accuracy(ground_truth, pred):
     """
-    :param target: Ground truth.
-    :param pred: Output of our model.
+    :param ground_truth: Ground truth
+    :param pred: Output of our model
     :return: Returns the percentage correct pixel (ground truth == model output).
     """
     map_pred = torch.argmax(pred, dim=1)
-    target = target.detach().cpu().numpy()
-    matches = np.sum(target == map_pred.detach().cpu().numpy())
-    return matches / target.size
+    ground_truth = ground_truth.detach().cpu().numpy()
+    matches = np.sum(ground_truth == map_pred.detach().cpu().numpy())
+    return matches / ground_truth.size
 
-def iou_single_class(preds, labels, class_idx):
+def iou_single_class(preds, ground_truth, class_idx):
+    """
+    Calculates the IOU for one class
+    :param preds: Output of our model
+    :param ground_truth: Ground truth
+    :return: Returns the IOU for once class
+    """
     class_pred = (torch.argmax(preds, dim=1) == class_idx).detach().cpu().numpy()
-    class_label = (labels == class_idx).detach().cpu().numpy()
-    intersection = np.logical_and(class_pred, class_label).sum()
-    union = np.logical_or(class_pred, class_label).sum()
+    class_ground_truth = (ground_truth == class_idx).detach().cpu().numpy()
+    intersection = np.logical_and(class_pred, class_ground_truth).sum()
+    union = np.logical_or(class_pred,  class_ground_truth).sum()
 
     iou = intersection / union if union != 0 else 0
     return iou
 
-def accuracy(labels, preds, num_classes = 3):
-    ious = [iou_single_class(preds, labels, class_idx) for class_idx in range(num_classes)]
+def IOU_accuracy(ground_truth, preds, num_classes = 3):
+    """
+    Calculates thee meanIOU for a given number of classes
+    :param ground_truth: Ground truth
+    :param preds: Output of our model
+    :param num_classes: Number of different classes in the image
+    """
+    ious = [iou_single_class(preds, ground_truth, class_idx) for class_idx in range(num_classes)]
     mean_iou = sum(ious) / num_classes
     return mean_iou
 
@@ -192,15 +205,6 @@ def load_images_from_directory(directory):
     return images
 
 
-data_directory = "data/"
-label_directory = "labels/"
-data = load_images_from_directory(data_directory)
-labels = load_images_from_directory(label_directory)
-
-"""
-Create a class to load our data into a dataloader and scale the u16bit and u8bit to [0,1]
-"""
-
 
 class CustomSegmentationDataset(Dataset):
     def __init__(self, image_dir, mask_dir, transform):
@@ -251,6 +255,12 @@ transform_original_padded = transforms.Compose(
     [transforms.ToTensor(), transforms.Pad((6, 6, 5, 5), padding_mode="edge")
      ])
 
+
+data_directory = "data/"
+label_directory = "labels/"
+data = load_images_from_directory(data_directory)
+labels = load_images_from_directory(label_directory)
+
 # Create datasets
 dataset_train_val = CustomSegmentationDataset(image_dir="data/", mask_dir="labels/", transform=transform_resized_train_val)
 dataset_test = CustomSegmentationDataset(image_dir="data/", mask_dir="labels/", transform=transform_original_padded)
@@ -269,9 +279,9 @@ test_dataloader = DataLoader(test_data, shuffle=False, batch_size=BATCH_SIZE)
 print("Creating Model ")
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model = UNet_3Plus(in_channels=1, n_classes=3).to(device)
-# Use CrossEntropyLoss: Changes the putput of UNet3Plus from softmax to logits
 
-loss_fn = DiceLoss()
+# loss_fn = DiceLoss()
+loss_fn =  smp.losses.DiceLoss(mode="multiclass", from_logits=True, smooth = 1.0)
 
 optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
@@ -283,7 +293,7 @@ valid_accuracies = []
 train_losses = []
 valid_losses = []
 
-#current_time = time.time()
+current_time = time.time()
 
 for epoch in range(NUM_EPOCHS):
     train_accuracies_batches = []
@@ -305,7 +315,7 @@ for epoch in range(NUM_EPOCHS):
         # Increment step counter
         step += 1
 
-        train_accuracies_batches.append(accuracy(targets, output))
+        train_accuracies_batches.append(IOU_accuracy(targets, output))
         train_losses_batches.append(loss.item())
 
         if step % VAL_EVERY_STEPS == 0:
@@ -332,7 +342,7 @@ for epoch in range(NUM_EPOCHS):
                     loss = loss_fn(output, targets)
 
                     # Multiply by len(x) because the final batch of DataLoader may be smaller (drop_last=False).
-                    valid_accuracies_batches.append(accuracy(targets, output) * len(inputs))
+                    valid_accuracies_batches.append(IOU_accuracy(targets, output) * len(inputs))
                     valid_losses_batches.append(loss.item())
                 model.train()
 
@@ -358,13 +368,13 @@ if TESTING:
             loss = loss_fn(output, targets)
 
             # Multiply by len(x) because the final batch of DataLoader may be smaller (drop_last=False).
-            test_accuracies_batches.append(accuracy(targets, output) * len(inputs))
+            test_accuracies_batches.append(IOU_accuracy(targets, output) * len(inputs))
 
     # Calculate average test accuracy
     test_accuracy = np.sum(test_accuracies_batches) / len(test_data)
     print(f"Test accuracy: {test_accuracy}")
 
 
-#current_time = time.time() - current_time
-#print(f"Finished training. Took {current_time/60} min")
+current_time = time.time() - current_time
+print(f"Finished training. Took {current_time/60} min")
 plot_train_val_loss_and_accuarcy(train_losses, valid_losses, train_accuracies, valid_accuracies)

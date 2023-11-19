@@ -23,18 +23,18 @@ import segmentation_models_pytorch as smp
 class Hyperparameters:
     def __init__(self):
         self.resize_to = 128
-        self.batch_size = 1
-        self.num_epochs = 1
+        self.batch_size = 16
+        self.num_epochs = 3
         self.val_freq = 40
         self.learning_rate = 1e-4
-        self.noise = 256
+        self.noise = 1024
 
     def display(self):
         print("Hyperparameters:")
         print(f"Images resized to {self.resize_to} x {self.resize_to}")
         print(f"Batch size: {1}\nNumber of epochs: {self.num_epochs}\n"
-              f"Validation is done ever {self.val_freq} steps\nLearning rate: {self.learning_rate}\nç"
-              f"Noise: {self.noise}")
+              f"Validation is done ever {self.val_freq} steps\nLearning rate: {self.learning_rate}\n"
+              f"Noise: {self.noise}\n")
 
 
 hyperparameters = Hyperparameters()
@@ -269,7 +269,7 @@ class CustomSegmentationDataset(Dataset):
 
 # Resize the training and validation set (501x501 -> 128x128)
 transform_resized_train_val = transforms.Compose(
-    [transforms.ToTensor(), transforms.Resize((hyperparameters.resize_to, hyperparameters.resize_to))])
+    [transforms.ToTensor(), transforms.Resize((hyperparameters.resize_to, hyperparameters.resize_to), antialias=True)])
 
 # Add padding to the test set (501x501 -> 512x512)
 transform_original_padded = transforms.Compose(
@@ -294,14 +294,16 @@ train_dataset, val_dataset, test_dataset = random_split(dataset, [train_size, va
 
 train_dataset.dataset.transform = transform_resized_train_val
 val_dataset.dataset.transform = transform_resized_train_val
-test_dataset.dataset.transform = transform_original_padded
+if TESTING:
+    test_dataset.dataset.transform = transform_original_padded
 
 train_dataloader = DataLoader(train_dataset, shuffle=True, batch_size=hyperparameters.batch_size)
 val_dataloader = DataLoader(val_dataset, shuffle=False, batch_size=hyperparameters.batch_size)
-test_dataloader = DataLoader(test_dataset, shuffle=False, batch_size=hyperparameters.batch_size)
+if TESTING:
+    test_dataloader = DataLoader(test_dataset, shuffle=False, batch_size=hyperparameters.batch_size)
 
 # Create model
-print("Creating Model ")
+print("Creating Model\n")
 hyperparameters.display()
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model = UNet_3Plus(in_channels=1, n_classes=3).to(device)
@@ -376,7 +378,7 @@ for epoch in range(hyperparameters.num_epochs):
             valid_accuracies.append(np.sum(valid_accuracies_batches) / len(val_dataset))
             valid_losses.append(np.sum(valid_losses_batches) / len(val_dataset))
 
-            print(f"Step {step}   training accuracy: {train_accuracies[-1]}")
+            print(f"Step {step}  training accuracy: {train_accuracies[-1]}")
             print(f"             validation accuracy: {valid_accuracies[-1]}")
             print(f"             dice loss over the three classes: {loss}")
 

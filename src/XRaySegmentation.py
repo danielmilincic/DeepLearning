@@ -17,24 +17,31 @@ import time
 import torchvision.transforms.functional as TF
 import segmentation_models_pytorch as smp
 
+
 # HYPERPARAMETERS
+
+class Hyperparameters:
+    def __init__(self):
+        self.resize_to = 128
+        self.batch_size = 1
+        self.num_epochs = 1
+        self.val_freq = 40
+        self.learning_rate = 1e-4
+        self.noise = 256
+
+    def display(self):
+        print("Hyperparameters:")
+        print(f"Images resized to {self.resize_to} x {self.resize_to}")
+        print(f"Batch size: {1}\nNumber of epochs: {self.num_epochs}\n"
+              f"Validation is done ever {self.val_freq} steps\nLearning rate: {self.learning_rate}"
+              f"Noise: {self.noise}")
+
+
+hyperparameters = Hyperparameters()
 
 # DO NOT CHANGE THIS TO TRUE UNLESS YOU WANT TO GENERATE NEW DATASET FROM SCRATCH
 GENERATION = False
 
-# Resize the images to a square of size RESIZE_TO x RESIZE_TO
-RESIZE_TO = 128
-
-# Training parameters
-BATCH_SIZE = 8  # batch_size : num_steps_per_epoch => 8:44 16:22 32:11
-NUM_EPOCHS = 1
-VAL_EVERY_STEPS = 40
-LEARNING_RATE = 1e-4
-
-# Add Gaussian noise to the images
-NOISE = True
-
-# Set to True to test the model after training and validation are done.
 TESTING = False
 
 # Generate augmented data and save it to the disk
@@ -57,7 +64,6 @@ if GENERATION:
         for file in os.listdir("new_labels"):
             os.remove(f"new_labels/{file}")
         print("Deleted all files in new_labels directory")
-
 
     step = 1
     # Iterate over all images and labels
@@ -244,9 +250,9 @@ class CustomSegmentationDataset(Dataset):
         image = (np.asarray(image) / (2 ** 8 + 1)).astype(np.uint8)  # scale it to [0,255]
 
         # Add Gaussian noise to the image
-        if NOISE:
+        if hyperparameters.noise is not None:
             mean = 0
-            variance = 256  # You can change this value
+            variance = hyperparameters.noise  # You can change this value
             sigma = np.sqrt(variance)
             gaussian = np.random.normal(mean, sigma, image.shape)
             image = image + gaussian
@@ -263,42 +269,47 @@ class CustomSegmentationDataset(Dataset):
 
 # Resize the training and validation set (501x501 -> 128x128)
 transform_resized_train_val = transforms.Compose(
-    [transforms.ToTensor(), transforms.Resize((RESIZE_TO, RESIZE_TO))])
+    [transforms.ToTensor(), transforms.Resize((hyperparameters.resize_to, hyperparameters.resize_to))])
 
 # Add padding to the test set (501x501 -> 512x512)
 transform_original_padded = transforms.Compose(
     [transforms.ToTensor(), transforms.Pad((6, 6, 5, 5), padding_mode="edge")
      ])
 
-data_directory = "data/"
-label_directory = "labels/"
+data_directory = "new_data/"
+label_directory = "new_labels/"
 data = load_images_from_directory(data_directory)
 labels = load_images_from_directory(label_directory)
 
 # Create datasets
-dataset_train_val = CustomSegmentationDataset(image_dir=data_directory, mask_dir=label_directory,
-                                              transform=transform_resized_train_val)
-dataset_test = CustomSegmentationDataset(image_dir=data_directory, mask_dir=label_directory, transform=transform_original_padded)
+dataset = CustomSegmentationDataset(image_dir=data_directory, mask_dir=label_directory,
+                                    transform=None)
+train_size = int(0.8 * len(dataset))
+val_size = int(0.1 * len(dataset))
+test_size = len(dataset) - (train_size + val_size)
 
-# Split the first dataset into training and validation set
 random_seed = torch.Generator().manual_seed(random.randint(0, 10000))
-train_data, val_data = random_split(dataset_train_val, [0.75, 0.25], random_seed)
-train_dataloader = DataLoader(train_data, shuffle=True, batch_size=BATCH_SIZE)
-val_dataloader = DataLoader(val_data, shuffle=False, batch_size=BATCH_SIZE)
+train_dataset, val_dataset, test_dataset = random_split(dataset, [train_size, val_size, test_size], random_seed)
+# Split the first dataset into training and validation set
 
-# Create test dataloader
-test_data = dataset_test
-test_dataloader = DataLoader(test_data, shuffle=False, batch_size=BATCH_SIZE)
+train_dataset.dataset.transform = transform_resized_train_val
+val_dataset.dataset.transform = transform_resized_train_val
+test_dataset.dataset.transform = transform_original_padded
+
+train_dataloader = DataLoader(train_dataset, shuffle=True, batch_size=hyperparameters.batch_size)
+val_dataloader = DataLoader(val_dataset, shuffle=False, batch_size=hyperparameters.batch_size)
+test_dataloader = DataLoader(test_dataset, shuffle=False, batch_size=hyperparameters.batch_size)
 
 # Create model
 print("Creating Model ")
+hyperparameters.display()
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model = UNet_3Plus(in_channels=1, n_classes=3).to(device)
 
 # loss_fn = DiceLoss()
 loss_fn = smp.losses.DiceLoss(mode="multiclass", from_logits=True, smooth=1.0)
 
-optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
+optimizer = torch.optim.Adam(model.parameters(), lr=hyperparameters.learning_rate)
 
 step = 0
 model.train()
@@ -310,7 +321,7 @@ valid_losses = []
 
 current_time = time.time()
 
-for epoch in range(NUM_EPOCHS):
+for epoch in range(hyperparameters.num_epochs):
     train_accuracies_batches = []
     train_losses_batches = []
 
@@ -333,7 +344,7 @@ for epoch in range(NUM_EPOCHS):
         train_accuracies_batches.append(IOU_accuracy(targets, output))
         train_losses_batches.append(loss.item())
 
-        if step % VAL_EVERY_STEPS == 0:
+        if step % hyperparameters.val_freq == 0:
 
             # Append average training accuracy to list.
             train_accuracies.append(np.mean(train_accuracies_batches))
@@ -362,8 +373,8 @@ for epoch in range(NUM_EPOCHS):
                 model.train()
 
             # Append average validation accuracy to list.
-            valid_accuracies.append(np.sum(valid_accuracies_batches) / len(val_data))
-            valid_losses.append(np.sum(valid_losses_batches) / len(val_data))
+            valid_accuracies.append(np.sum(valid_accuracies_batches) / len(val_dataset))
+            valid_losses.append(np.sum(valid_losses_batches) / len(val_dataset))
 
             print(f"Step {step}   training accuracy: {train_accuracies[-1]}")
             print(f"             validation accuracy: {valid_accuracies[-1]}")
@@ -385,7 +396,7 @@ if TESTING:
             test_accuracies_batches.append(IOU_accuracy(targets, output) * len(inputs))
 
     # Calculate average test accuracy
-    test_accuracy = np.sum(test_accuracies_batches) / len(test_data)
+    test_accuracy = np.sum(test_accuracies_batches) / len(test_dataset)
     print(f"Test accuracy: {test_accuracy}")
 
 current_time = time.time() - current_time

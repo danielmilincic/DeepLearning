@@ -27,12 +27,12 @@ class Hyperparameters:
         self.num_epochs = 3
         self.val_freq = 40
         self.learning_rate = 1e-4
-        self.noise = 0.05*255 # standard deviation of the noise added to the images
+        self.noise = 0*0.05*255 # standard deviation of the noise added to the images
 
     def display(self):
         print("Hyperparameters:")
         print(f"Images resized to {self.resize_to} x {self.resize_to}")
-        print(f"Batch size: {1}\nNumber of epochs: {self.num_epochs}\n"
+        print(f"Batch size: {self.batch_size}\nNumber of epochs: {self.num_epochs}\n"
               f"Validation is done ever {self.val_freq} steps\nLearning rate: {self.learning_rate}\n"
               f"Noise standard deviation: {self.noise}\n")
 
@@ -267,16 +267,6 @@ class CustomSegmentationDataset(Dataset):
     def apply_transform(self, image, label):
         image = (np.asarray(image) / (2 ** 8 + 1)).astype(np.uint8)  # scale it to [0,255]
 
-        # Add Gaussian noise to the image
-        if hyperparameters.noise is not None:
-            mean = 0
-            variance = hyperparameters.noise  # You can change this value
-            sigma = np.sqrt(variance)
-            gaussian = np.random.normal(mean, sigma, image.shape)
-            image = image + gaussian
-
-        image[image < 0] = 0
-        image[image > 255] = 255
         image = Image.fromarray(image)
 
         image = self.transform(image)

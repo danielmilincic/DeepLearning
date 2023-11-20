@@ -266,17 +266,6 @@ class CustomSegmentationDataset(Dataset):
 
     def apply_transform(self, image, label):
         image = (np.asarray(image) / (2 ** 8 + 1)).astype(np.uint8)  # scale it to [0,255]
-
-        # Add Gaussian noise to the image
-        if hyperparameters.noise is not None:
-            mean = 0
-            variance = hyperparameters.noise  # You can change this value
-            sigma = np.sqrt(variance)
-            gaussian = np.random.normal(mean, sigma, image.shape)
-            image = image + gaussian
-
-        image[image < 0] = 0
-        image[image > 255] = 255
         image = Image.fromarray(image)
 
         image = self.transform(image)

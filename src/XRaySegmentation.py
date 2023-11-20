@@ -27,14 +27,14 @@ class Hyperparameters:
         self.num_epochs = 3
         self.val_freq = 40
         self.learning_rate = 1e-4
-        self.noise = 1024
+        self.noise = 0.05*255 # standard deviation of the noise added to the images
 
     def display(self):
         print("Hyperparameters:")
         print(f"Images resized to {self.resize_to} x {self.resize_to}")
         print(f"Batch size: {1}\nNumber of epochs: {self.num_epochs}\n"
               f"Validation is done ever {self.val_freq} steps\nLearning rate: {self.learning_rate}\n"
-              f"Noise: {self.noise}\n")
+              f"Noise standard deviation: {self.noise}\n")
 
 
 hyperparameters = Hyperparameters()
@@ -93,6 +93,24 @@ if GENERATION:
         vflip_label = ImageOps.flip(label)
         vflip_image.save(f"new_data/vflip_{step}.png")
         vflip_label.save(f"new_labels/vflip_{step}.png")
+
+        # Horizontal and vertical flip
+        hvflip_image = ImageOps.mirror(vflip_image)
+        hvflip_label = ImageOps.mirror(vflip_label)
+        hvflip_image.save(f"new_data/hvflip_{step}.png")
+        hvflip_label.save(f"new_labels/hvflip_{step}.png")
+
+        # Rotate 90 degrees
+        rot90_image = image.rotate(90)
+        rot90_label = label.rotate(90)
+        rot90_image.save(f"new_data/rot90_{step}.png")
+        rot90_label.save(f"new_labels/rot90_{step}.png")
+
+        # Rotate 270 degrees
+        rot270_image = image.rotate(270)
+        rot270_label = label.rotate(270)
+        rot270_image.save(f"new_data/rot270_{step}.png")
+        rot270_label.save(f"new_labels/rot270_{step}.png")
 
         # Original image and label
         image.save(f"new_data/image_{step}.png")
@@ -329,6 +347,18 @@ for epoch in range(hyperparameters.num_epochs):
 
     for inputs, targets in train_dataloader:
         model.train()
+
+        # Add noise to the inputs
+        mean = 0
+        sigma = hyperparameters.noise  # You can change this value up
+        gaussian = np.random.normal(mean, sigma, inputs.shape)
+        inputs = inputs + gaussian
+        inputs[inputs < 0] = 0
+        inputs[inputs > 255] = 255
+
+        # Convert inputs to float
+        inputs = inputs.float()
+
         inputs, targets = inputs.to(device), targets.to(device)
 
         targets = map_target_to_class(targets)

@@ -21,9 +21,9 @@ class Hyperparameters:
         self.resize_to = 128
         self.batch_size = 16
         self.num_epochs = 3
-        self.val_freq = 40
+        self.val_freq = 5
         self.learning_rate = 1e-4
-        self.noise = 0.05*255 # standard deviation of the noise added to the images
+        self.noise = 0.00*255 # standard deviation of the noise added to the images
         self.seed = 20
         self.config = 1
 
@@ -200,6 +200,7 @@ def plot_image_and_label_output(org_image, ground_truth, step, output=None, name
     if not os.path.exists("img"):
         os.mkdir("img")
     plt.savefig(f"img/{name}_{step}.png")
+    plt.close()
 
 
 def plot_train_val_loss_and_accuracy(train_loss, val_loss, train_acc, val_acc):
@@ -228,15 +229,16 @@ def plot_train_val_loss_and_accuracy(train_loss, val_loss, train_acc, val_acc):
     plt.savefig(f"img/seed={hyperparameters.seed}_{hyperparameters.config}_train_val_metric.png")
 
 
-def plot_confusion_matrix(ground_truth, predictions):
-    cm = confusion_matrix(ground_truth, predictions)
-    class_labels = ["C0, C1, C2"]
+def plot_confusion_matrix(ground_truth, predictions, step):
+    cm = confusion_matrix(ground_truth, predictions, labels=[0, 1, 2], normalize="true")
+    class_labels = ["C0", "C1", "C2"]
     plt.figure(figsize=(10, 7))
-    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=class_labels, yticklabels=class_labels)
-    plt.xlabel('Predicted')
-    plt.ylabel('True')
+    sns.heatmap(cm, annot=True, cmap='Blues', xticklabels=class_labels, yticklabels=class_labels)
+    plt.xlabel('Model Output')
+    plt.ylabel('Ground Truth')
     plt.title("Confusion Matrix")
-    plt.savefig(f"img/seed={hyperparameters.seed}_{hyperparameters.config}_confusion_matrix.png")
+    plt.savefig(f"img/step={step}_seed={hyperparameters.seed}_{hyperparameters.config}_confusion_matrix.png")
+    plt.close()
 
 
 
@@ -347,15 +349,16 @@ for epoch in range(hyperparameters.num_epochs):
         model.train()
 
         # Add noise to the inputs
-        mean = 0
-        sigma = hyperparameters.noise  # You can change this value up
-        gaussian = np.random.normal(mean, sigma, inputs.shape)
-        inputs = inputs + gaussian
-        inputs[inputs < 0] = 0
-        inputs[inputs > 255] = 255
+        if hyperparameters.noise != 0:
+            mean = 0
+            sigma = hyperparameters.noise  # You can change this value up
+            gaussian = np.random.normal(mean, sigma, inputs.shape)
+            inputs = inputs + gaussian
+            inputs[inputs < 0] = 0
+            inputs[inputs > 255] = 255
 
-        # Convert inputs to float
-        inputs = inputs.float()
+            # Convert inputs to float
+            inputs = inputs.float()
 
         inputs, targets = inputs.to(device), targets.to(device)
 
@@ -374,7 +377,7 @@ for epoch in range(hyperparameters.num_epochs):
         train_accuracies_batches.append(IOU_accuracy(targets, output))
         train_losses_batches.append(loss.item())
 
-        if step % hyperparameters.val_freq == 0:
+        if step % hyperparameters.val_freq == 0 or step == 0 or step == 1:
 
             # Append average training accuracy to list.
             train_accuracies.append(np.mean(train_accuracies_batches))
@@ -394,7 +397,7 @@ for epoch in range(hyperparameters.num_epochs):
                     output = model(inputs)
 
                     loss = loss_fn(output, targets)
-                    plot_confusion_matrix(targets, torch.argmax(output, dim=1))
+                    plot_confusion_matrix(targets.detach().cpu().numpy().flatten().tolist(), torch.argmax(output, dim=1).detach().cpu().numpy().flatten().tolist(), step=step)
                     # Multiply by len(x) because the final batch of DataLoader may be smaller (drop_last=False).
                     valid_accuracies_batches.append(IOU_accuracy(targets, output) * len(inputs))
                     valid_losses_batches.append(loss.item())

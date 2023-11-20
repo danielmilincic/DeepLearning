@@ -27,7 +27,7 @@ class Hyperparameters:
         self.num_epochs = 3
         self.val_freq = 40
         self.learning_rate = 1e-4
-        self.noise = 0*0.05*255 # standard deviation of the noise added to the images
+        self.noise = 0 # standard deviation of the noise added to the images
 
     def display(self):
         print("Hyperparameters:")
@@ -338,6 +338,7 @@ for epoch in range(hyperparameters.num_epochs):
     for inputs, targets in train_dataloader:
         model.train()
 
+        '''
         # Add noise to the inputs
         mean = 0
         sigma = hyperparameters.noise  # You can change this value up
@@ -348,7 +349,8 @@ for epoch in range(hyperparameters.num_epochs):
 
         # Convert inputs to float
         inputs = inputs.float()
-
+        '''
+        
         inputs, targets = inputs.to(device), targets.to(device)
 
         targets = map_target_to_class(targets)

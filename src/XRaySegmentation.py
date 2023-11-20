@@ -32,7 +32,7 @@ class Hyperparameters:
     def display(self):
         print("Hyperparameters:")
         print(f"Images resized to {self.resize_to} x {self.resize_to}")
-        print(f"Batch size: {1}\nNumber of epochs: {self.num_epochs}\n"
+        print(f"Batch size: {self.batch_size}\nNumber of epochs: {self.num_epochs}\n"
               f"Validation is done ever {self.val_freq} steps\nLearning rate: {self.learning_rate}\n"
               f"Noise standard deviation: {self.noise}\n")
 

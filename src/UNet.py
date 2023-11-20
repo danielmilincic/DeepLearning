@@ -79,4 +79,4 @@ class UNet(nn.Module):
 
         d1 = self.outconv1(up1)  # 256
 
-        return F.sigmoid(d1)
+        return d1

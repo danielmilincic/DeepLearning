@@ -18,12 +18,22 @@ import seaborn as sns
 
 class Hyperparameters:
     def __init__(self):
+        """
+        # INFO about Noise parameters:
+        # - for Scenario 1 (no noise): set the noise parameters to 0
+        # - for Scenario 2 (noise only on Test inputs): set the noise parameters to 
+        #   the desired values and set NOISE_ONLY_TESTING to True
+        # - for Scenario 3 (noise on Train,Val,Test inputs): set the noise parameters to 
+        #   the desired values and set NOISE_ONLY_TESTING to False
+        """
         self.resize_to = 128
         self.batch_size = 16
         self.num_epochs = 3
         self.val_freq = 5
         self.learning_rate = 1e-4
-        self.noise = 0.00*255 # standard deviation of the noise added to the images
+        self.noise_gaussian_std = 0.00*255
+        self.noise_salt_pepper_prob = 0.00
+        self.noise_poisson_lambda = 5  # try values around 5 maybe
         self.seed = 20
         self.config = 1
 
@@ -32,7 +42,9 @@ class Hyperparameters:
         print(f"Images resized to {self.resize_to} x {self.resize_to}")
         print(f"Batch size: {self.batch_size}\nNumber of epochs: {self.num_epochs}\n"
               f"Validation is done ever {self.val_freq} steps\nLearning rate: {self.learning_rate}\n"
-              f"Noise standard deviation: {self.noise}\n")
+              f"Gaussian noise standard deviation: {self.noise_gaussian_std}\n"
+              f"Salt and pepper noise probability: {self.noise_salt_pepper_prob}\n"
+              f"Poisson noise lambda: {self.noise_poisson_lambda}\n")
 
 
 hyperparameters = Hyperparameters()
@@ -40,11 +52,27 @@ hyperparameters = Hyperparameters()
 # DO NOT CHANGE THIS TO TRUE UNLESS YOU WANT TO GENERATE NEW DATASET FROM SCRATCH
 GENERATION = False
 
+# Set this to True if you want to test the model on the test set at the end of the training
 TESTING = False
+
+# for Scenario 2 set this to True, for Scenario 1 and Scenario 3 set this to False
+NOISE_ONLY_TESTING = False
+
+
+if NOISE_ONLY_TESTING:
+    # Save the noise parameters in temporary variables to restore them in testing
+    temp_gaussian = hyperparameters.noise_gaussian_std
+    temp_salt_pepper = hyperparameters.noise_salt_pepper_prob
+    temp_poisson = hyperparameters.noise_poisson_lambda
+
+    # Set the noise parameters to 0 to not add noise during training
+    hyperparameters.noise_gaussian_std = 0.00*255
+    hyperparameters.noise_salt_pepper_prob = 0.00
+    hyperparameters.noise_poisson_lambda = 0.00
+
 
 # Generate augmented data and save it to the disk
 if GENERATION:
-
     # Create directories for the new data and labels if they do not exist
     if not os.path.exists("new_data"):
         os.mkdir("new_data")
@@ -241,9 +269,6 @@ def plot_confusion_matrix(ground_truth, predictions, step):
     plt.close()
 
 
-
-
-
 def get_image_files(data_path):
     return sorted(os.listdir(data_path))
 
@@ -256,6 +281,61 @@ def load_images_from_directory(directory):
         image = cv2.imread(os.path.join(directory, image_file), cv2.IMREAD_UNCHANGED)
         images.append(image)
     return images
+
+
+def add_gaussian_noise(image_in, noise_sigma):
+    mean = 0
+    gaussian = np.random.normal(mean, noise_sigma, image_in.shape)
+    image_in = image_in + gaussian
+    image_in[image_in < 0] = 0
+    image_in[image_in > 255] = 255
+
+    # Convert image to float
+    image_in = image_in.float()
+
+    return image_in
+
+
+def add_salt_pepper_noise(image_in, salt_pepper_prob):
+    # Get the total number of pixels in the image
+    total_pixels = image_in.numel()
+
+    # Calculate the number of salt and pepper pixels
+    num_salt = np.ceil(salt_pepper_prob * total_pixels / 2.).astype(int)
+    num_pepper = np.ceil(salt_pepper_prob * total_pixels / 2.).astype(int)
+
+    # Generate random indices for salt and pepper
+    salt_coords = torch.randint(0, total_pixels, (num_salt,))
+    pepper_coords = torch.randint(0, total_pixels, (num_pepper,))
+
+    # Flatten the image for easier indexing
+    flat_image = image_in.view(-1)
+
+    # Add salt and pepper noise
+    flat_image[salt_coords] = 255
+    flat_image[pepper_coords] = 0
+
+    # Reshape the image to its original shape
+    image_in = flat_image.view(image_in.shape)
+
+    # Convert image to float
+    image_in = image_in.float()
+
+    return image_in
+
+
+def add_poisson_noise(image_in, lam):
+    noise = np.random.poisson(lam, image_in.shape)
+    image_in = image_in + noise
+    image_in[image_in < 0] = 0
+    image_in[image_in > 255] = 255
+
+    # Convert image to float
+    image_in = image_in.float()
+
+    return image_in
+
+
 
 
 class CustomSegmentationDataset(Dataset):
@@ -346,20 +426,13 @@ for epoch in range(hyperparameters.num_epochs):
     train_losses_batches = []
 
     for inputs, targets in train_dataloader:
-        model.train()
-
-        '''
-        # Add noise to the inputs
-        if hyperparameters.noise != 0:
-            mean = 0
-            sigma = hyperparameters.noise  # You can change this value up
-            gaussian = np.random.normal(mean, sigma, inputs.shape)
-            inputs = inputs + gaussian
-            inputs[inputs < 0] = 0
-            inputs[inputs > 255] = 255
-
-            # Convert inputs to float
-            inputs = inputs.float()
+        # Add eventual noise to the inputs
+        if hyperparameters.noise_gaussian_std != 0:
+            inputs = add_gaussian_noise(inputs, hyperparameters.noise_gaussian_std)
+        elif hyperparameters.noise_salt_pepper_prob != 0:
+            inputs = add_salt_pepper_noise(inputs, hyperparameters.noise_salt_pepper_prob)
+        elif hyperparameters.noise_poisson_lambda != 0:
+            inputs = add_poisson_noise(inputs, hyperparameters.noise_poisson_lambda)
 
         inputs, targets = inputs.to(device), targets.to(device)
 
@@ -393,6 +466,14 @@ for epoch in range(hyperparameters.num_epochs):
             with torch.no_grad():
                 model.eval()
                 for inputs, targets in val_dataloader:
+                    # Add eventual noise to the inputs
+                    if hyperparameters.noise_gaussian_std != 0:
+                        inputs = add_gaussian_noise(inputs, hyperparameters.noise_gaussian_std)
+                    elif hyperparameters.noise_salt_pepper_prob != 0:
+                        inputs = add_salt_pepper_noise(inputs, hyperparameters.noise_salt_pepper_prob)
+                    elif hyperparameters.noise_poisson_lambda != 0:
+                        inputs = add_poisson_noise(inputs, hyperparameters.noise_poisson_lambda)
+
                     inputs, targets = inputs.to(device), targets.to(device)
                     targets = map_target_to_class(targets)
                     output = model(inputs)
@@ -416,3 +497,36 @@ for epoch in range(hyperparameters.num_epochs):
 current_time = time.time() - current_time
 print(f"Finished training. Took {current_time / 60} min")
 plot_train_val_loss_and_accuracy(train_losses, valid_losses, train_accuracies, valid_accuracies)
+
+if TESTING:
+    test_accuracies = []
+    test_losses = []
+    with torch.no_grad():
+        model.eval()
+        for inputs, targets in test_dataloader:
+            # Add eventual noise to the inputs
+            if NOISE_ONLY_TESTING:
+                if temp_gaussian != 0:
+                    inputs = add_gaussian_noise(inputs, temp_gaussian)
+                elif temp_salt_pepper != 0:
+                    inputs = add_salt_pepper_noise(inputs, temp_salt_pepper)
+                elif temp_poisson != 0:
+                    inputs = add_poisson_noise(inputs, temp_poisson)
+            elif hyperparameters.noise_gaussian_std != 0:
+                inputs = add_gaussian_noise(inputs, hyperparameters.noise_gaussian_std)
+            elif hyperparameters.noise_salt_pepper_prob != 0:
+                inputs = add_salt_pepper_noise(inputs, hyperparameters.noise_salt_pepper_prob)
+            elif hyperparameters.noise_poisson_lambda != 0:
+                inputs = add_poisson_noise(inputs, hyperparameters.noise_poisson_lambda)
+            
+            inputs, targets = inputs.to(device), targets.to(device)
+            targets = map_target_to_class(targets)
+            output = model(inputs)
+            loss = loss_fn(output, targets)
+            test_accuracies.append(IOU_accuracy(targets, output))
+            test_losses.append(loss.item())
+            plot_confusion_matrix(targets.detach().cpu().numpy().flatten().tolist(),
+                                  torch.argmax(output, dim=1).detach().cpu().numpy().flatten().tolist(), step=step)
+
+        print(f"Test accuracy: {np.mean(test_accuracies)}")
+        print(f"Test loss: {np.mean(test_losses)}")

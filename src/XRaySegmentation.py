@@ -1,21 +1,17 @@
 import cv2
 import os
 import numpy as np
-from sklearn import metrics
 from torchvision import transforms
 from torch.utils.data import Dataset, random_split, DataLoader
 from PIL import Image, ImageOps
 import matplotlib.pyplot as plt
-from sklearn.model_selection import train_test_split
-import torch
 from UNet_3Plus import UNet_3Plus
 import torch.nn.functional as F
 from dice_loss import *
-import dice_loss as dl
-import random
 import time
-import torchvision.transforms.functional as TF
 import segmentation_models_pytorch as smp
+from sklearn.metrics import confusion_matrix
+import seaborn as sns
 
 
 # HYPERPARAMETERS
@@ -25,9 +21,11 @@ class Hyperparameters:
         self.resize_to = 128
         self.batch_size = 16
         self.num_epochs = 3
-        self.val_freq = 40
+        self.val_freq = 5
         self.learning_rate = 1e-4
-        self.noise = 0 # standard deviation of the noise added to the images
+        self.noise = 0.00*255 # standard deviation of the noise added to the images
+        self.seed = 20
+        self.config = 1
 
     def display(self):
         print("Hyperparameters:")
@@ -140,7 +138,7 @@ def pixelwise_accuracy(ground_truth, pred):
     return matches / ground_truth.size
 
 
-def iou_single_class(preds, ground_truth, class_idx):
+def iou_single_class(ground_truth, preds, class_idx):
     """
     Calculates the IOU for one class
     :param preds: Output of our model
@@ -164,7 +162,7 @@ def IOU_accuracy(ground_truth, preds, num_classes=3):
     :param preds: Output of our model
     :param num_classes: Number of different classes in the image
     """
-    ious = [iou_single_class(preds, ground_truth, class_idx) for class_idx in range(num_classes)]
+    ious = [iou_single_class(ground_truth, preds, class_idx) for class_idx in range(num_classes)]
     mean_iou = sum(ious) / num_classes
     return mean_iou
 
@@ -202,6 +200,7 @@ def plot_image_and_label_output(org_image, ground_truth, step, output=None, name
     if not os.path.exists("img"):
         os.mkdir("img")
     plt.savefig(f"img/{name}_{step}.png")
+    plt.close()
 
 
 def plot_train_val_loss_and_accuracy(train_loss, val_loss, train_acc, val_acc):
@@ -211,7 +210,7 @@ def plot_train_val_loss_and_accuracy(train_loss, val_loss, train_acc, val_acc):
     plt.plot(epochs, train_acc, 'b-', label='Training Accuracy')
     plt.plot(epochs, val_acc, 'r-', label='Validation Accuracy')
     plt.title('Training and Validation Accuracy')
-    plt.xlabel('Epochs')
+    plt.xlabel('Validation Step')
     plt.ylabel('Accuracy')
     plt.legend()
 
@@ -227,7 +226,22 @@ def plot_train_val_loss_and_accuracy(train_loss, val_loss, train_acc, val_acc):
     # create the directory if it does not exist
     if not os.path.exists("img"):
         os.mkdir("img")
-    plt.savefig("img/overfitting.png")
+    plt.savefig(f"img/seed={hyperparameters.seed}_{hyperparameters.config}_train_val_metric.png")
+
+
+def plot_confusion_matrix(ground_truth, predictions, step):
+    cm = confusion_matrix(ground_truth, predictions, labels=[0, 1, 2], normalize="true")
+    class_labels = ["C0", "C1", "C2"]
+    plt.figure(figsize=(10, 7))
+    sns.heatmap(cm, annot=True, cmap='Blues', xticklabels=class_labels, yticklabels=class_labels)
+    plt.xlabel('Model Output')
+    plt.ylabel('Ground Truth')
+    plt.title("Confusion Matrix")
+    plt.savefig(f"img/step={step}_seed={hyperparameters.seed}_{hyperparameters.config}_confusion_matrix.png")
+    plt.close()
+
+
+
 
 
 def get_image_files(data_path):
@@ -266,9 +280,7 @@ class CustomSegmentationDataset(Dataset):
 
     def apply_transform(self, image, label):
         image = (np.asarray(image) / (2 ** 8 + 1)).astype(np.uint8)  # scale it to [0,255]
-
         image = Image.fromarray(image)
-
         image = self.transform(image)
         label = self.transform(label)
 
@@ -296,7 +308,7 @@ train_size = int(0.8 * len(dataset))
 val_size = int(0.1 * len(dataset))
 test_size = len(dataset) - (train_size + val_size)
 
-random_seed = torch.Generator().manual_seed(random.randint(0, 10000))
+random_seed = torch.Generator().manual_seed(hyperparameters.seed)
 train_dataset, val_dataset, test_dataset = random_split(dataset, [train_size, val_size, test_size], random_seed)
 # Split the first dataset into training and validation set
 
@@ -316,9 +328,7 @@ hyperparameters.display()
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model = UNet_3Plus(in_channels=1, n_classes=3).to(device)
 
-# loss_fn = DiceLoss()
 loss_fn = smp.losses.DiceLoss(mode="multiclass", from_logits=True, smooth=1.0)
-
 optimizer = torch.optim.Adam(model.parameters(), lr=hyperparameters.learning_rate)
 
 step = 0
@@ -340,17 +350,17 @@ for epoch in range(hyperparameters.num_epochs):
 
         '''
         # Add noise to the inputs
-        mean = 0
-        sigma = hyperparameters.noise  # You can change this value up
-        gaussian = np.random.normal(mean, sigma, inputs.shape)
-        inputs = inputs + gaussian
-        inputs[inputs < 0] = 0
-        inputs[inputs > 255] = 255
+        if hyperparameters.noise != 0:
+            mean = 0
+            sigma = hyperparameters.noise  # You can change this value up
+            gaussian = np.random.normal(mean, sigma, inputs.shape)
+            inputs = inputs + gaussian
+            inputs[inputs < 0] = 0
+            inputs[inputs > 255] = 255
 
-        # Convert inputs to float
-        inputs = inputs.float()
-        '''
-        
+            # Convert inputs to float
+            inputs = inputs.float()
+
         inputs, targets = inputs.to(device), targets.to(device)
 
         targets = map_target_to_class(targets)
@@ -368,7 +378,7 @@ for epoch in range(hyperparameters.num_epochs):
         train_accuracies_batches.append(IOU_accuracy(targets, output))
         train_losses_batches.append(loss.item())
 
-        if step % hyperparameters.val_freq == 0:
+        if step % hyperparameters.val_freq == 0 or step == 0 or step == 1:
 
             # Append average training accuracy to list.
             train_accuracies.append(np.mean(train_accuracies_batches))
@@ -386,11 +396,9 @@ for epoch in range(hyperparameters.num_epochs):
                     inputs, targets = inputs.to(device), targets.to(device)
                     targets = map_target_to_class(targets)
                     output = model(inputs)
-                    # save the last image and label of the validation set plot_image_and_label_output(inputs[0],
-                    # targets[0], step,  torch.argmax(output[0], dim=1), name="val")
 
                     loss = loss_fn(output, targets)
-
+                    plot_confusion_matrix(targets.detach().cpu().numpy().flatten().tolist(), torch.argmax(output, dim=1).detach().cpu().numpy().flatten().tolist(), step=step)
                     # Multiply by len(x) because the final batch of DataLoader may be smaller (drop_last=False).
                     valid_accuracies_batches.append(IOU_accuracy(targets, output) * len(inputs))
                     valid_losses_batches.append(loss.item())
@@ -404,24 +412,6 @@ for epoch in range(hyperparameters.num_epochs):
             print(f"             validation accuracy: {valid_accuracies[-1]}")
             print(f"             dice loss over the three classes: {loss}")
 
-if TESTING:
-
-    # Test the mode after training and validation (model tuning) are done.
-    test_accuracies_batches = []
-    with torch.no_grad():
-        model.eval()
-        for inputs, targets in test_dataloader:
-            inputs, targets = inputs.to(device), targets.to(device)
-            targets = map_target_to_class(targets)
-            output = model(inputs)
-            loss = loss_fn(output, targets)
-
-            # Multiply by len(x) because the final batch of DataLoader may be smaller (drop_last=False).
-            test_accuracies_batches.append(IOU_accuracy(targets, output) * len(inputs))
-
-    # Calculate average test accuracy
-    test_accuracy = np.sum(test_accuracies_batches) / len(test_dataset)
-    print(f"Test accuracy: {test_accuracy}")
 
 current_time = time.time() - current_time
 print(f"Finished training. Took {current_time / 60} min")

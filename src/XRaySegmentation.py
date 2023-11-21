@@ -348,6 +348,7 @@ for epoch in range(hyperparameters.num_epochs):
     for inputs, targets in train_dataloader:
         model.train()
 
+        '''
         # Add noise to the inputs
         if hyperparameters.noise != 0:
             mean = 0

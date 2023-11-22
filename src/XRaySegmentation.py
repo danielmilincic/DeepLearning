@@ -269,6 +269,27 @@ def plot_confusion_matrix(ground_truth, predictions, step, name):
     plt.close()
 
 
+def extract_image_data(dataset):
+    images_data = []
+    labels_data = []
+    for image, label in dataset:
+        # Flatten the image and label tensors and convert them to numpy arrays
+        images_data.extend(image.flatten().numpy())
+        labels_data.extend(label.flatten().numpy())
+    return images_data, labels_data
+
+
+def plot_hist(data, name):
+    """
+    Plots the histogram of the whole data. 
+    """
+    data = extract_image_data(data)
+    plt.hist(data, bins=256, color = "blue")
+    plt.title(name)
+    plt.tight_layout()
+    plt.savefig(f"{name}.png")
+    plt.close()
+
 def get_image_files(data_path):
     return sorted(os.listdir(data_path))
 
@@ -336,8 +357,6 @@ def add_poisson_noise(image_in, lam):
     return image_in
 
 
-
-
 class CustomSegmentationDataset(Dataset):
     def __init__(self, image_dir, mask_dir, transform):
         self.image_dir = image_dir
@@ -382,25 +401,36 @@ data = load_images_from_directory(data_directory)
 labels = load_images_from_directory(label_directory)
 
 # Create datasets
-dataset = CustomSegmentationDataset(image_dir=data_directory, mask_dir=label_directory,
-                                    transform=None)
+dataset = CustomSegmentationDataset(image_dir=data_directory, mask_dir=label_directory, transform=None)
+
+plot_hist(dataset, "Whole Data")
 train_size = int(0.8 * len(dataset))
 val_size = int(0.1 * len(dataset))
 test_size = len(dataset) - (train_size + val_size)
 
+# Split data
 random_seed = torch.Generator().manual_seed(hyperparameters.seed)
 train_dataset, val_dataset, test_dataset = random_split(dataset, [train_size, val_size, test_size], random_seed)
-# Split the first dataset into training and validation set
 
+# Apply transform
 train_dataset.dataset.transform = transform_resized_train_val
 val_dataset.dataset.transform = transform_resized_train_val
 if TESTING:
     test_dataset.dataset.transform = transform_original_padded
 
+
+plot_hist(train_dataset, name = "Train Data")
+plot_hist(val_dataset, name = "Validation Data")
+
+if TESTING:
+    plot_hist(test_dataset, name = "Test Data")
+
 train_dataloader = DataLoader(train_dataset, shuffle=True, batch_size=hyperparameters.batch_size)
 val_dataloader = DataLoader(val_dataset, shuffle=False, batch_size=hyperparameters.batch_size)
 if TESTING:
     test_dataloader = DataLoader(test_dataset, shuffle=False, batch_size=hyperparameters.batch_size)
+
+exit()
 
 # Create model
 print("Creating Model\n")

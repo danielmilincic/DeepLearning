@@ -257,7 +257,7 @@ def plot_train_val_loss_and_accuracy(train_loss, val_loss, train_acc, val_acc):
     plt.savefig(f"img/seed={hyperparameters.seed}_{hyperparameters.config}_train_val_metric.png")
 
 
-def plot_confusion_matrix(ground_truth, predictions, step):
+def plot_confusion_matrix(ground_truth, predictions, step, name):
     cm = confusion_matrix(ground_truth, predictions, labels=[0, 1, 2], normalize="true")
     class_labels = ["C0", "C1", "C2"]
     plt.figure(figsize=(10, 7))
@@ -265,7 +265,7 @@ def plot_confusion_matrix(ground_truth, predictions, step):
     plt.xlabel('Model Output')
     plt.ylabel('Ground Truth')
     plt.title("Confusion Matrix")
-    plt.savefig(f"img/step={step}_seed={hyperparameters.seed}_{hyperparameters.config}_confusion_matrix.png")
+    plt.savefig(f"img/step={step}_seed={hyperparameters.seed}_{hyperparameters.config}_{name}_cm.png")
     plt.close()
 
 
@@ -479,7 +479,7 @@ for epoch in range(hyperparameters.num_epochs):
                     output = model(inputs)
 
                     loss = loss_fn(output, targets)
-                    plot_confusion_matrix(targets.detach().cpu().numpy().flatten().tolist(), torch.argmax(output, dim=1).detach().cpu().numpy().flatten().tolist(), step=step)
+                    plot_confusion_matrix(targets.detach().cpu().numpy().flatten().tolist(), torch.argmax(output, dim=1).detach().cpu().numpy().flatten().tolist(), step=step, name = "val")
                     # Multiply by len(x) because the final batch of DataLoader may be smaller (drop_last=False).
                     valid_accuracies_batches.append(IOU_accuracy(targets, output) * len(inputs))
                     valid_losses_batches.append(loss.item())
@@ -525,8 +525,7 @@ if TESTING:
             loss = loss_fn(output, targets)
             test_accuracies.append(IOU_accuracy(targets, output))
             test_losses.append(loss.item())
-            plot_confusion_matrix(targets.detach().cpu().numpy().flatten().tolist(),
-                                  torch.argmax(output, dim=1).detach().cpu().numpy().flatten().tolist(), step=step)
+            plot_confusion_matrix(targets.detach().cpu().numpy().flatten().tolist(),torch.argmax(output, dim=1).detach().cpu().numpy().flatten().tolist(), step=step, name="test")
 
         print(f"Test accuracy: {np.mean(test_accuracies)}")
         print(f"Test loss: {np.mean(test_losses)}")

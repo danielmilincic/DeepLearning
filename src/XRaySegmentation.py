@@ -225,9 +225,9 @@ def plot_image_and_label_output(org_image, ground_truth, step, output=None, name
         axs[2].set_title("Output")
         axs[2].axis('off')
     # create the directory if it does not exist
-    if not os.path.exists("img"):
-        os.mkdir("img")
-    plt.savefig(f"img/{name}_{step}.png")
+    if not os.path.exists(f"img/conf_{hyperparameters.config}"):
+        os.mkdir(f"img/conf_{hyperparameters.config}")
+    plt.savefig(f"img/conf_{hyperparameters.config}/{name}_{step}.png")
     plt.close()
 
 
@@ -252,9 +252,9 @@ def plot_train_val_loss_and_accuracy(train_loss, val_loss, train_acc, val_acc):
 
     plt.tight_layout()
     # create the directory if it does not exist
-    if not os.path.exists("img"):
-        os.mkdir("img")
-    plt.savefig(f"img/seed={hyperparameters.seed}_{hyperparameters.config}_train_val_metric.png")
+    if not os.path.exists(f"img/conf_{hyperparameters.config}"):
+        os.mkdir(f"img/conf_{hyperparameters.config}")
+    plt.savefig(f"img/conf_{hyperparameters.config}/seed={hyperparameters.seed}_{hyperparameters.config}_train_val_metric.png")
 
 
 def plot_confusion_matrix(ground_truth, predictions, step, name):
@@ -265,7 +265,9 @@ def plot_confusion_matrix(ground_truth, predictions, step, name):
     plt.xlabel('Model Output')
     plt.ylabel('Ground Truth')
     plt.title("Confusion Matrix")
-    plt.savefig(f"img/step={step}_seed={hyperparameters.seed}_{hyperparameters.config}_{name}_cm.png")
+    if not os.path.exists(f"img/conf_{hyperparameters.config}"):
+        os.mkdir(f"img/conf_{hyperparameters.config}")
+    plt.savefig(f"img/conf_{hyperparameters.config}/step={step}_seed={hyperparameters.seed}_{hyperparameters.config}_{name}_cm.png")
     plt.close()
 
 
@@ -283,11 +285,16 @@ def plot_hist(data, name):
     """
     Plots the histogram of the whole data. 
     """
-    data = extract_image_data(data)
-    plt.hist(data, bins=256, color = "blue")
-    plt.title(name)
+    data, ground_truth = extract_image_data(data)
+    fig, axs = plt.subplots(1,2, figsize=(10,5))
+    axs[0].hist(data, bins=256, color="blue", range=(0, 1))
+    axs[0].set_title(name)
+    axs[1].hist(ground_truth, bins=256, color="green", range=(0, 1))
+    axs[1].set_title(f"{name} Ground Truth")
     plt.tight_layout()
-    plt.savefig(f"{name}.png")
+    if not os.path.exists(f"img/conf_{hyperparameters.config}"):
+        os.mkdir(f"img/conf_{hyperparameters.config}")
+    plt.savefig(f"img/conf_{hyperparameters.config}/{name}_hist.png")
     plt.close()
 
 def get_image_files(data_path):
@@ -373,8 +380,8 @@ class CustomSegmentationDataset(Dataset):
         label_path = os.path.join(self.label_dir, self.labels[idx])
         image = Image.open(image_path)
         label = Image.open(label_path)
-
-        image, label = self.apply_transform(image, label)
+        if self.transform:
+            image, label = self.apply_transform(image, label)
         return image, label
 
     def apply_transform(self, image, label):
@@ -403,34 +410,27 @@ labels = load_images_from_directory(label_directory)
 # Create datasets
 dataset = CustomSegmentationDataset(image_dir=data_directory, mask_dir=label_directory, transform=None)
 
-plot_hist(dataset, "Whole Data")
+# Split data
 train_size = int(0.8 * len(dataset))
 val_size = int(0.1 * len(dataset))
 test_size = len(dataset) - (train_size + val_size)
-
-# Split data
 random_seed = torch.Generator().manual_seed(hyperparameters.seed)
 train_dataset, val_dataset, test_dataset = random_split(dataset, [train_size, val_size, test_size], random_seed)
 
 # Apply transform
 train_dataset.dataset.transform = transform_resized_train_val
 val_dataset.dataset.transform = transform_resized_train_val
-if TESTING:
-    test_dataset.dataset.transform = transform_original_padded
 
-
-plot_hist(train_dataset, name = "Train Data")
-plot_hist(val_dataset, name = "Validation Data")
-
-if TESTING:
-    plot_hist(test_dataset, name = "Test Data")
+# Plot histograms
+plot_hist(train_dataset, name="Train Data")
+plot_hist(val_dataset, name="Validation Data")
 
 train_dataloader = DataLoader(train_dataset, shuffle=True, batch_size=hyperparameters.batch_size)
 val_dataloader = DataLoader(val_dataset, shuffle=False, batch_size=hyperparameters.batch_size)
 if TESTING:
+    test_dataset.dataset.transform = transform_original_padded
+    plot_hist(test_dataset, name="Test Data")
     test_dataloader = DataLoader(test_dataset, shuffle=False, batch_size=hyperparameters.batch_size)
-
-exit()
 
 # Create model
 print("Creating Model\n")

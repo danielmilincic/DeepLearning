@@ -27,7 +27,7 @@ class Hyperparameters:
         # - for Scenario 3 (noise on Train,Val,Test inputs): set the noise parameters to 
         #   the desired values and set NOISE_ONLY_TESTING to False
         """
-        self.batch_size = 2
+        self.batch_size = 4
         self.num_epochs = 1
         self.val_freq = 320
         self.learning_rate = 1e-4
@@ -35,7 +35,7 @@ class Hyperparameters:
         self.noise_salt_pepper_prob = 0.00
         self.noise_poisson_lambda = 0  # try values around 5 maybe
         self.seed = 20
-        self.config = 4
+        self.config = 7
 
     def display(self):
         print("Hyperparameters:")
@@ -301,6 +301,9 @@ def extract_image_data(dataset):
         # Flatten the image and label tensors and convert them to numpy arrays
         images_data.extend(image.flatten().numpy())
         labels_data.extend(label.flatten().numpy())
+        # Convert the lists to NumPy arrays
+    images_data = np.array(images_data)
+    labels_data = np.array(labels_data)
     return images_data, labels_data
 
 
@@ -309,11 +312,18 @@ def plot_hist(data, name):
     Plots the histogram of the whole data. 
     """
     data, ground_truth = extract_image_data(data)
-    fig, axs = plt.subplots(1,2, figsize=(10,5))
-    axs[0].hist(data, bins=256, color="blue", range=(0, 1))
+    data_hist, data_bins = np.histogram(data, bins=256, range=(0, 1))
+    ground_truth_hist, gt_bins = np.histogram(ground_truth, bins=256, range=(0, 1))
+
+    # Create a single figure
+    fig, axs = plt.subplots(1, 2, figsize=(10, 5))
+
+    # Plot histograms
+    axs[0].hist(data_bins[:-1], data_bins, weights=data_hist, color="blue")
     axs[0].set_title(name)
-    axs[1].hist(ground_truth, bins=256, color="green", range=(0, 1))
+    axs[1].hist(gt_bins[:-1], gt_bins, weights=ground_truth_hist, color="green")
     axs[1].set_title(f"{name} Ground Truth")
+
     plt.tight_layout()
     # create the directory if it does not exist
     if not os.path.exists("img"):

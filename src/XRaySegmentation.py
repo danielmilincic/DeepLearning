@@ -27,15 +27,15 @@ class Hyperparameters:
         # - for Scenario 3 (noise on Train,Val,Test inputs): set the noise parameters to 
         #   the desired values and set NOISE_ONLY_TESTING to False
         """
-        self.batch_size = 1
-        self.num_epochs = 3
-        self.val_freq = 5
+        self.batch_size = 2
+        self.num_epochs = 1
+        self.val_freq = 320
         self.learning_rate = 1e-4
         self.noise_gaussian_std = 0.00*255
         self.noise_salt_pepper_prob = 0.00
-        self.noise_poisson_lambda = 5  # try values around 5 maybe
+        self.noise_poisson_lambda = 0  # try values around 5 maybe
         self.seed = 20
-        self.config = 1
+        self.config = 4
 
     def display(self):
         print("Hyperparameters:")
@@ -248,36 +248,35 @@ def plot_image_and_label_output(org_image, ground_truth, step, output=None, name
         axs[2].set_title("Output")
         axs[2].axis('off')
     # create the directory if it does not exist
-    if not os.path.exists(f"img/conf_{hyperparameters.config}"):
-        os.mkdir(f"img/conf_{hyperparameters.config}")
-    plt.savefig(f"img/conf_{hyperparameters.config}/{name}_{step}.png")
+    if not os.path.exists("img"):
+        os.mkdir("img")
+    plt.savefig(f"img/conf_{hyperparameters.config}_{name}_{step}.png")
     plt.close()
 
 
-def plot_train_val_loss_and_accuracy(train_loss, val_loss, train_acc, val_acc):
-    epochs = range(1, len(train_acc) + 1)
+def plot_train_val_loss_and_accuracy(train_loss, val_loss, train_acc, val_acc, steps):
     plt.figure(figsize=(12, 5))
     plt.subplot(1, 2, 1)
-    plt.plot(epochs, train_acc, 'b-', label='Training Accuracy')
-    plt.plot(epochs, val_acc, 'r-', label='Validation Accuracy')
+    plt.plot(steps, train_acc, 'b-', label='Training Accuracy')
+    plt.plot(steps, val_acc, 'r-', label='Validation Accuracy')
     plt.title('Training and Validation Accuracy')
-    plt.xlabel('Validation Step')
+    plt.xlabel('Step')
     plt.ylabel('Accuracy')
     plt.legend()
 
     plt.subplot(1, 2, 2)
-    plt.plot(epochs, train_loss, 'b-', label='Training Loss')
-    plt.plot(epochs, val_loss, 'r-', label='Validation Loss')
+    plt.plot(steps, train_loss, 'b-', label='Training Loss')
+    plt.plot(steps, val_loss, 'r-', label='Validation Loss')
     plt.title('Training and Validation Loss')
-    plt.xlabel('Epochs')
+    plt.xlabel('Step')
     plt.ylabel('Loss')
     plt.legend()
 
     plt.tight_layout()
     # create the directory if it does not exist
-    if not os.path.exists(f"img/conf_{hyperparameters.config}"):
-        os.mkdir(f"img/conf_{hyperparameters.config}")
-    plt.savefig(f"img/conf_{hyperparameters.config}/seed={hyperparameters.seed}_{hyperparameters.config}_train_val_metric.png")
+    if not os.path.exists("img"):
+        os.mkdir("img")
+    plt.savefig(f"img/conf_{hyperparameters.config}_train_val_metric.png")
 
 
 def plot_confusion_matrix(ground_truth, predictions, step, name):
@@ -288,9 +287,10 @@ def plot_confusion_matrix(ground_truth, predictions, step, name):
     plt.xlabel('Model Output')
     plt.ylabel('Ground Truth')
     plt.title("Confusion Matrix")
-    if not os.path.exists(f"img/conf_{hyperparameters.config}"):
-        os.mkdir(f"img/conf_{hyperparameters.config}")
-    plt.savefig(f"img/conf_{hyperparameters.config}/step={step}_seed={hyperparameters.seed}_{hyperparameters.config}_{name}_cm.png")
+    # create the directory if it does not exist
+    if not os.path.exists("img"):
+        os.mkdir("img")
+    plt.savefig(f"img/conf_{hyperparameters.config}_confmatrix_step_{step}.png")
     plt.close()
 
 
@@ -315,9 +315,10 @@ def plot_hist(data, name):
     axs[1].hist(ground_truth, bins=256, color="green", range=(0, 1))
     axs[1].set_title(f"{name} Ground Truth")
     plt.tight_layout()
-    if not os.path.exists(f"img/conf_{hyperparameters.config}"):
-        os.mkdir(f"img/conf_{hyperparameters.config}")
-    plt.savefig(f"img/conf_{hyperparameters.config}/{name}_hist.png")
+    # create the directory if it does not exist
+    if not os.path.exists("img"):
+        os.mkdir("img")
+    plt.savefig(f"img/conf_{hyperparameters.config}_{name}_hist.png")
     plt.close()
 
 def get_image_files(data_path):
@@ -458,6 +459,8 @@ valid_accuracies = []
 train_losses = []
 valid_losses = []
 
+steps = []
+
 current_time = time.time()
 
 for epoch in range(hyperparameters.num_epochs):
@@ -490,7 +493,9 @@ for epoch in range(hyperparameters.num_epochs):
         train_accuracies_batches.append(IOU_accuracy(targets, output))
         train_losses_batches.append(loss.item())
 
-        if step % hyperparameters.val_freq == 0 or step == 0 or step == 1:
+        if ((step <= 100 and step % 5 == 0) or (step % hyperparameters.val_freq == 0) or step == 0 or step == 1):
+
+            steps.append(step)
 
             # Append average training accuracy to list.
             train_accuracies.append(np.mean(train_accuracies_batches))
@@ -536,7 +541,7 @@ for epoch in range(hyperparameters.num_epochs):
 
 current_time = time.time() - current_time
 print(f"Finished training. Took {current_time / 60} min")
-plot_train_val_loss_and_accuracy(train_losses, valid_losses, train_accuracies, valid_accuracies)
+plot_train_val_loss_and_accuracy(train_losses, valid_losses, train_accuracies, valid_accuracies, steps)
 
 if TESTING:
     test_accuracies = []

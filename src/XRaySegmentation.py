@@ -57,6 +57,8 @@ TESTING = False
 # for Scenario 2 set this to True, for Scenario 1 and Scenario 3 set this to False
 NOISE_ONLY_TESTING = False
 
+# set to true if you want to plot graphs
+PLOT_GRAPHS = False
 
 if NOISE_ONLY_TESTING:
     # Save the noise parameters in temporary variables to restore them in testing
@@ -428,13 +430,15 @@ random_seed = torch.Generator().manual_seed(hyperparameters.seed)
 train_dataset, val_dataset, test_dataset = random_split(dataset, [train_size, val_size, test_size], random_seed)
 
 # Plot histograms
-plot_hist(train_dataset, name="Train Data")
-plot_hist(val_dataset, name="Validation Data")
+if(PLOT_GRAPHS):
+    plot_hist(train_dataset, name="Train Data")
+    plot_hist(val_dataset, name="Validation Data")
 
 train_dataloader = DataLoader(train_dataset, shuffle=True, batch_size=hyperparameters.batch_size)
 val_dataloader = DataLoader(val_dataset, shuffle=False, batch_size=hyperparameters.batch_size)
 if TESTING:
-    plot_hist(test_dataset, name="Test Data")
+    if(PLOT_GRAPHS):
+        plot_hist(test_dataset, name="Test Data")
     test_dataloader = DataLoader(test_dataset, shuffle=False, batch_size=hyperparameters.batch_size)
 
 # Create model
@@ -514,7 +518,8 @@ for epoch in range(hyperparameters.num_epochs):
                     output = model(inputs)
 
                     loss = loss_fn(output, targets)
-                    plot_confusion_matrix(targets.detach().cpu().numpy().flatten().tolist(), torch.argmax(output, dim=1).detach().cpu().numpy().flatten().tolist(), step=step, name = "val")
+                    if(PLOT_GRAPHS):
+                        plot_confusion_matrix(targets.detach().cpu().numpy().flatten().tolist(), torch.argmax(output, dim=1).detach().cpu().numpy().flatten().tolist(), step=step, name = "val")
                     # Multiply by len(x) because the final batch of DataLoader may be smaller (drop_last=False).
                     valid_accuracies_batches.append(IOU_accuracy(targets, output) * len(inputs))
                     valid_losses_batches.append(loss.item())
@@ -560,7 +565,8 @@ if TESTING:
             loss = loss_fn(output, targets)
             test_accuracies.append(IOU_accuracy(targets, output))
             test_losses.append(loss.item())
-            plot_confusion_matrix(targets.detach().cpu().numpy().flatten().tolist(),torch.argmax(output, dim=1).detach().cpu().numpy().flatten().tolist(), step=step, name="test")
+            if(PLOT_GRAPHS):
+                plot_confusion_matrix(targets.detach().cpu().numpy().flatten().tolist(),torch.argmax(output, dim=1).detach().cpu().numpy().flatten().tolist(), step=step, name="test")
 
         print(f"Test accuracy: {np.mean(test_accuracies)}")
         print(f"Test loss: {np.mean(test_losses)}")

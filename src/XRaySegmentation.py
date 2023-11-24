@@ -12,6 +12,7 @@ import time
 import segmentation_models_pytorch as smp
 from sklearn.metrics import confusion_matrix
 import seaborn as sns
+import random
 
 
 # HYPERPARAMETERS
@@ -50,7 +51,7 @@ class Hyperparameters:
 hyperparameters = Hyperparameters()
 
 # DO NOT CHANGE THIS TO TRUE UNLESS YOU WANT TO GENERATE NEW DATASET FROM SCRATCH
-GENERATION = False
+GENERATION = True
 
 # Set this to True if you want to test the model on the test set at the end of the training
 TESTING = False
@@ -71,8 +72,24 @@ if NOISE_ONLY_TESTING:
     hyperparameters.noise_poisson_lambda = 0.00
 
 
+def random_crop(image, label, crop_size):
+    width, height = image.size
+    random.seed(hyperparameters.seed)
+    left = np.random.randint(0, width - crop_size + 1)
+    top = np.random.randint(0, height - crop_size + 1)
+    right = left + crop_size
+    bottom = top + crop_size
+
+    image = image.crop((left, top, right, bottom))
+    label = label.crop((left, top, right, bottom))
+
+    return image, label
+
+
 # Generate augmented data and save it to the disk
 if GENERATION:
+    crop_size = 256
+
     # Create directories for the new data and labels if they do not exist
     if not os.path.exists("new_data"):
         os.mkdir("new_data")
@@ -111,36 +128,42 @@ if GENERATION:
         # Horizontal flip
         hflip_image = ImageOps.mirror(image)
         hflip_label = ImageOps.mirror(label)
-        hflip_image.save(f"new_data/hflip_{step}.png")
-        hflip_label.save(f"new_labels/hflip_{step}.png")
+        cropped_image, cropped_label = random_crop(hflip_image, hflip_label, crop_size)
+        cropped_image.save(f"new_data/hflip_{step}.png")
+        cropped_label.save(f"new_labels/hflip_{step}.png")
 
         # Vertical flip
         vflip_image = ImageOps.flip(image)
         vflip_label = ImageOps.flip(label)
-        vflip_image.save(f"new_data/vflip_{step}.png")
-        vflip_label.save(f"new_labels/vflip_{step}.png")
+        cropped_image, cropped_label = random_crop(vflip_image, vflip_label, crop_size)
+        cropped_image.save(f"new_data/vflip_{step}.png")
+        cropped_label.save(f"new_labels/vflip_{step}.png")
 
         # Horizontal and vertical flip
         hvflip_image = ImageOps.mirror(vflip_image)
         hvflip_label = ImageOps.mirror(vflip_label)
-        hvflip_image.save(f"new_data/hvflip_{step}.png")
-        hvflip_label.save(f"new_labels/hvflip_{step}.png")
+        cropped_image, cropped_label = random_crop(hvflip_image, hvflip_label, crop_size)
+        cropped_image.save(f"new_data/hvflip_{step}.png")
+        cropped_label.save(f"new_labels/hvflip_{step}.png")
 
         # Rotate 90 degrees
         rot90_image = image.rotate(90)
         rot90_label = label.rotate(90)
-        rot90_image.save(f"new_data/rot90_{step}.png")
-        rot90_label.save(f"new_labels/rot90_{step}.png")
+        cropped_image, cropped_label = random_crop(rot90_image, rot90_label, crop_size)
+        cropped_image.save(f"new_data/rot90_{step}.png")
+        cropped_label.save(f"new_labels/rot90_{step}.png")
 
         # Rotate 270 degrees
         rot270_image = image.rotate(270)
         rot270_label = label.rotate(270)
-        rot270_image.save(f"new_data/rot270_{step}.png")
-        rot270_label.save(f"new_labels/rot270_{step}.png")
+        cropped_image, cropped_label = random_crop(rot270_image, rot270_label, crop_size)
+        cropped_image.save(f"new_data/rot270_{step}.png")
+        cropped_label.save(f"new_labels/rot270_{step}.png")
 
         # Original image and label
-        image.save(f"new_data/image_{step}.png")
-        label.save(f"new_labels/image_{step}.png")
+        cropped_image, cropped_label = random_crop(image, label, crop_size)
+        cropped_image.save(f"new_data/original_{step}.png")
+        cropped_label.save(f"new_labels/original_{step}.png")
 
         print(f"Step {step} done")
         step += 1
@@ -380,27 +403,10 @@ class CustomSegmentationDataset(Dataset):
         label_path = os.path.join(self.label_dir, self.labels[idx])
         image = Image.open(image_path)
         label = Image.open(label_path)
-        if self.transform:
-            image, label = self.apply_transform(image, label)
-        return image, label
-
-    def apply_transform(self, image, label):
         image = (np.asarray(image) / (2 ** 8 + 1)).astype(np.uint8)  # scale it to [0,255]
         image = Image.fromarray(image)
-        image = self.transform(image)
-        label = self.transform(label)
-
         return image, label
 
-
-# Resize the training and validation set (501x501 -> 128x128)
-transform_resized_train_val = transforms.Compose(
-    [transforms.ToTensor(), transforms.Resize((hyperparameters.resize_to, hyperparameters.resize_to), antialias=True)])
-
-# Add padding to the test set (501x501 -> 512x512)
-transform_original_padded = transforms.Compose(
-    [transforms.ToTensor(), transforms.Pad((6, 6, 5, 5), padding_mode="edge")
-     ])
 
 data_directory = "new_data/"
 label_directory = "new_labels/"
@@ -417,10 +423,6 @@ test_size = len(dataset) - (train_size + val_size)
 random_seed = torch.Generator().manual_seed(hyperparameters.seed)
 train_dataset, val_dataset, test_dataset = random_split(dataset, [train_size, val_size, test_size], random_seed)
 
-# Apply transform
-train_dataset.dataset.transform = transform_resized_train_val
-val_dataset.dataset.transform = transform_resized_train_val
-
 # Plot histograms
 plot_hist(train_dataset, name="Train Data")
 plot_hist(val_dataset, name="Validation Data")
@@ -428,7 +430,6 @@ plot_hist(val_dataset, name="Validation Data")
 train_dataloader = DataLoader(train_dataset, shuffle=True, batch_size=hyperparameters.batch_size)
 val_dataloader = DataLoader(val_dataset, shuffle=False, batch_size=hyperparameters.batch_size)
 if TESTING:
-    test_dataset.dataset.transform = transform_original_padded
     plot_hist(test_dataset, name="Test Data")
     test_dataloader = DataLoader(test_dataset, shuffle=False, batch_size=hyperparameters.batch_size)
 

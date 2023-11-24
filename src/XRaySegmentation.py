@@ -27,7 +27,6 @@ class Hyperparameters:
         # - for Scenario 3 (noise on Train,Val,Test inputs): set the noise parameters to 
         #   the desired values and set NOISE_ONLY_TESTING to False
         """
-        self.resize_to = 128
         self.batch_size = 1
         self.num_epochs = 3
         self.val_freq = 5
@@ -40,7 +39,6 @@ class Hyperparameters:
 
     def display(self):
         print("Hyperparameters:")
-        print(f"Images resized to {self.resize_to} x {self.resize_to}")
         print(f"Batch size: {self.batch_size}\nNumber of epochs: {self.num_epochs}\n"
               f"Validation is done ever {self.val_freq} steps\nLearning rate: {self.learning_rate}\n"
               f"Gaussian noise standard deviation: {self.noise_gaussian_std}\n"

@@ -27,8 +27,7 @@ class Hyperparameters:
         # - for Scenario 3 (noise on Train,Val,Test inputs): set the noise parameters to 
         #   the desired values and set NOISE_ONLY_TESTING to False
         """
-        self.resize_to = 128
-        self.batch_size = 16
+        self.batch_size = 1
         self.num_epochs = 3
         self.val_freq = 5
         self.learning_rate = 1e-4
@@ -40,7 +39,6 @@ class Hyperparameters:
 
     def display(self):
         print("Hyperparameters:")
-        print(f"Images resized to {self.resize_to} x {self.resize_to}")
         print(f"Batch size: {self.batch_size}\nNumber of epochs: {self.num_epochs}\n"
               f"Validation is done ever {self.val_freq} steps\nLearning rate: {self.learning_rate}\n"
               f"Gaussian noise standard deviation: {self.noise_gaussian_std}\n"
@@ -51,7 +49,7 @@ class Hyperparameters:
 hyperparameters = Hyperparameters()
 
 # DO NOT CHANGE THIS TO TRUE UNLESS YOU WANT TO GENERATE NEW DATASET FROM SCRATCH
-GENERATION = True
+GENERATION = False
 
 # Set this to True if you want to test the model on the test set at the end of the training
 TESTING = False
@@ -405,6 +403,10 @@ class CustomSegmentationDataset(Dataset):
         label = Image.open(label_path)
         image = (np.asarray(image) / (2 ** 8 + 1)).astype(np.uint8)  # scale it to [0,255]
         image = Image.fromarray(image)
+        # apply tensor transformations
+        if self.transform:
+            image = self.transform(image)
+            label = self.transform(label)
         return image, label
 
 
@@ -413,8 +415,10 @@ label_directory = "new_labels/"
 data = load_images_from_directory(data_directory)
 labels = load_images_from_directory(label_directory)
 
+tranform_toTensor = transforms.ToTensor()
+
 # Create datasets
-dataset = CustomSegmentationDataset(image_dir=data_directory, mask_dir=label_directory, transform=None)
+dataset = CustomSegmentationDataset(image_dir=data_directory, mask_dir=label_directory, transform=tranform_toTensor)
 
 # Split data
 train_size = int(0.8 * len(dataset))

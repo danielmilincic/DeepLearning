@@ -437,7 +437,6 @@ if(PLOT_GRAPHS):
 train_dataloader = DataLoader(train_dataset, shuffle=True, batch_size=hyperparameters.batch_size)
 val_dataloader = DataLoader(val_dataset, shuffle=False, batch_size=hyperparameters.batch_size)
 if TESTING:
-    test_dataset.dataset.transform = transform_original_padded
     if(PLOT_GRAPHS):
         plot_hist(test_dataset, name="Test Data")
     test_dataloader = DataLoader(test_dataset, shuffle=False, batch_size=hyperparameters.batch_size)

@@ -33,7 +33,7 @@ class Hyperparameters:
         self.learning_rate = 1e-4
         self.noise_gaussian_std = 0.00*255
         self.noise_salt_pepper_prob = 0.00
-        self.noise_poisson_lambda = 5  # try values around 5 maybe
+        self.noise_poisson_lambda = 0  # try values around 5 maybe
         self.seed = 20
         self.config = 1
 

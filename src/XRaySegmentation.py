@@ -225,9 +225,9 @@ def plot_image_and_label_output(org_image, ground_truth, step, output=None, name
         axs[2].set_title("Output")
         axs[2].axis('off')
     # create the directory if it does not exist
-    if not os.path.exists("img"):
-        os.mkdir("img")
-    plt.savefig(f"img/{name}_{step}.png")
+    if not os.path.exists(f"img/conf_{hyperparameters.config}"):
+        os.mkdir(f"img/conf_{hyperparameters.config}")
+    plt.savefig(f"img/conf_{hyperparameters.config}/{name}_{step}.png")
     plt.close()
 
 
@@ -252,12 +252,12 @@ def plot_train_val_loss_and_accuracy(train_loss, val_loss, train_acc, val_acc):
 
     plt.tight_layout()
     # create the directory if it does not exist
-    if not os.path.exists("img"):
-        os.mkdir("img")
-    plt.savefig(f"img/seed={hyperparameters.seed}_{hyperparameters.config}_train_val_metric.png")
+    if not os.path.exists(f"img/conf_{hyperparameters.config}"):
+        os.mkdir(f"img/conf_{hyperparameters.config}")
+    plt.savefig(f"img/conf_{hyperparameters.config}/seed={hyperparameters.seed}_{hyperparameters.config}_train_val_metric.png")
 
 
-def plot_confusion_matrix(ground_truth, predictions, step):
+def plot_confusion_matrix(ground_truth, predictions, step, name):
     cm = confusion_matrix(ground_truth, predictions, labels=[0, 1, 2], normalize="true")
     class_labels = ["C0", "C1", "C2"]
     plt.figure(figsize=(10, 7))
@@ -265,9 +265,37 @@ def plot_confusion_matrix(ground_truth, predictions, step):
     plt.xlabel('Model Output')
     plt.ylabel('Ground Truth')
     plt.title("Confusion Matrix")
-    plt.savefig(f"img/step={step}_seed={hyperparameters.seed}_{hyperparameters.config}_confusion_matrix.png")
+    if not os.path.exists(f"img/conf_{hyperparameters.config}"):
+        os.mkdir(f"img/conf_{hyperparameters.config}")
+    plt.savefig(f"img/conf_{hyperparameters.config}/step={step}_seed={hyperparameters.seed}_{hyperparameters.config}_{name}_cm.png")
     plt.close()
 
+
+def extract_image_data(dataset):
+    images_data = []
+    labels_data = []
+    for image, label in dataset:
+        # Flatten the image and label tensors and convert them to numpy arrays
+        images_data.extend(image.flatten().numpy())
+        labels_data.extend(label.flatten().numpy())
+    return images_data, labels_data
+
+
+def plot_hist(data, name):
+    """
+    Plots the histogram of the whole data. 
+    """
+    data, ground_truth = extract_image_data(data)
+    fig, axs = plt.subplots(1,2, figsize=(10,5))
+    axs[0].hist(data, bins=256, color="blue", range=(0, 1))
+    axs[0].set_title(name)
+    axs[1].hist(ground_truth, bins=256, color="green", range=(0, 1))
+    axs[1].set_title(f"{name} Ground Truth")
+    plt.tight_layout()
+    if not os.path.exists(f"img/conf_{hyperparameters.config}"):
+        os.mkdir(f"img/conf_{hyperparameters.config}")
+    plt.savefig(f"img/conf_{hyperparameters.config}/{name}_hist.png")
+    plt.close()
 
 def get_image_files(data_path):
     return sorted(os.listdir(data_path))
@@ -336,8 +364,6 @@ def add_poisson_noise(image_in, lam):
     return image_in
 
 
-
-
 class CustomSegmentationDataset(Dataset):
     def __init__(self, image_dir, mask_dir, transform):
         self.image_dir = image_dir
@@ -354,8 +380,8 @@ class CustomSegmentationDataset(Dataset):
         label_path = os.path.join(self.label_dir, self.labels[idx])
         image = Image.open(image_path)
         label = Image.open(label_path)
-
-        image, label = self.apply_transform(image, label)
+        if self.transform:
+            image, label = self.apply_transform(image, label)
         return image, label
 
     def apply_transform(self, image, label):
@@ -382,24 +408,28 @@ data = load_images_from_directory(data_directory)
 labels = load_images_from_directory(label_directory)
 
 # Create datasets
-dataset = CustomSegmentationDataset(image_dir=data_directory, mask_dir=label_directory,
-                                    transform=None)
+dataset = CustomSegmentationDataset(image_dir=data_directory, mask_dir=label_directory, transform=None)
+
+# Split data
 train_size = int(0.8 * len(dataset))
 val_size = int(0.1 * len(dataset))
 test_size = len(dataset) - (train_size + val_size)
-
 random_seed = torch.Generator().manual_seed(hyperparameters.seed)
 train_dataset, val_dataset, test_dataset = random_split(dataset, [train_size, val_size, test_size], random_seed)
-# Split the first dataset into training and validation set
 
+# Apply transform
 train_dataset.dataset.transform = transform_resized_train_val
 val_dataset.dataset.transform = transform_resized_train_val
-if TESTING:
-    test_dataset.dataset.transform = transform_original_padded
+
+# Plot histograms
+plot_hist(train_dataset, name="Train Data")
+plot_hist(val_dataset, name="Validation Data")
 
 train_dataloader = DataLoader(train_dataset, shuffle=True, batch_size=hyperparameters.batch_size)
 val_dataloader = DataLoader(val_dataset, shuffle=False, batch_size=hyperparameters.batch_size)
 if TESTING:
+    test_dataset.dataset.transform = transform_original_padded
+    plot_hist(test_dataset, name="Test Data")
     test_dataloader = DataLoader(test_dataset, shuffle=False, batch_size=hyperparameters.batch_size)
 
 # Create model
@@ -479,7 +509,7 @@ for epoch in range(hyperparameters.num_epochs):
                     output = model(inputs)
 
                     loss = loss_fn(output, targets)
-                    plot_confusion_matrix(targets.detach().cpu().numpy().flatten().tolist(), torch.argmax(output, dim=1).detach().cpu().numpy().flatten().tolist(), step=step)
+                    plot_confusion_matrix(targets.detach().cpu().numpy().flatten().tolist(), torch.argmax(output, dim=1).detach().cpu().numpy().flatten().tolist(), step=step, name = "val")
                     # Multiply by len(x) because the final batch of DataLoader may be smaller (drop_last=False).
                     valid_accuracies_batches.append(IOU_accuracy(targets, output) * len(inputs))
                     valid_losses_batches.append(loss.item())
@@ -525,8 +555,7 @@ if TESTING:
             loss = loss_fn(output, targets)
             test_accuracies.append(IOU_accuracy(targets, output))
             test_losses.append(loss.item())
-            plot_confusion_matrix(targets.detach().cpu().numpy().flatten().tolist(),
-                                  torch.argmax(output, dim=1).detach().cpu().numpy().flatten().tolist(), step=step)
+            plot_confusion_matrix(targets.detach().cpu().numpy().flatten().tolist(),torch.argmax(output, dim=1).detach().cpu().numpy().flatten().tolist(), step=step, name="test")
 
         print(f"Test accuracy: {np.mean(test_accuracies)}")
         print(f"Test loss: {np.mean(test_losses)}")

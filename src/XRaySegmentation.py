@@ -27,9 +27,9 @@ class Hyperparameters:
         # - for Scenario 3 (noise on Train,Val,Test inputs): set the noise parameters to 
         #   the desired values and set NOISE_ONLY_TESTING to False
         """
-        self.batch_size = 2
+        self.batch_size = 1
         self.num_epochs = 1
-        self.val_freq = 320
+        self.val_freq = 500
         self.learning_rate = 1e-4
         self.noise_gaussian_std = 0.00*255
         self.noise_salt_pepper_prob = 0.00
@@ -218,7 +218,7 @@ def IOU_accuracy(ground_truth, preds, num_classes=3):
     return mean_iou
 
 
-def plot_image_and_label_output(org_image, ground_truth, step, output=None, name="example_output"):
+def plot_img_label_output(org_image, ground_truth, step, name, output=None):
     """
     Converts the tensors(1,1,X,Y) to numpy arrays(X,Y) and plots them.
     :param org_image: Original image
@@ -230,9 +230,9 @@ def plot_image_and_label_output(org_image, ground_truth, step, output=None, name
     """
     org_image = org_image.detach().cpu().squeeze().numpy()
     ground_truth = ground_truth.detach().cpu().squeeze().numpy()
-    output = output.detach().cpu().squeeze().numpy()
 
     if output is not None:
+        output = torch.argmax(output, dim=1).detach().cpu().squeeze().numpy()
         fig, axs = plt.subplots(1, 3)
     else:
         fig, axs = plt.subplots(1, 2)
@@ -250,7 +250,7 @@ def plot_image_and_label_output(org_image, ground_truth, step, output=None, name
     # create the directory if it does not exist
     if not os.path.exists("img"):
         os.mkdir("img")
-    plt.savefig(f"img/conf_{hyperparameters.config}_{name}_{step}.png")
+    plt.savefig(f"img/conf_{hyperparameters.config}_{name}_images_{step}.png")
     plt.close()
 
 
@@ -290,7 +290,7 @@ def plot_confusion_matrix(ground_truth, predictions, step, name):
     # create the directory if it does not exist
     if not os.path.exists("img"):
         os.mkdir("img")
-    plt.savefig(f"img/conf_{hyperparameters.config}_confmatrix_step_{step}.png")
+    plt.savefig(f"img/conf_{hyperparameters.config}_{name}_confmatrix_step_{step}.png")
     plt.close()
 
 
@@ -301,6 +301,8 @@ def extract_image_data(dataset):
         # Flatten the image and label tensors and convert them to numpy arrays
         images_data.extend(image.flatten().numpy())
         labels_data.extend(label.flatten().numpy())
+    images_data = np.array(images_data)
+    labels_data = np.array(labels_data)
     return images_data, labels_data
 
 
@@ -309,11 +311,18 @@ def plot_hist(data, name):
     Plots the histogram of the whole data. 
     """
     data, ground_truth = extract_image_data(data)
-    fig, axs = plt.subplots(1,2, figsize=(10,5))
-    axs[0].hist(data, bins=256, color="blue", range=(0, 1))
+    data_hist, data_bins = np.histogram(data, bins=256, range=(0, 1))
+    ground_truth_hist, gt_bins = np.histogram(ground_truth, bins=256, range=(0, 1))
+
+    # Create a single figure
+    fig, axs = plt.subplots(1, 2, figsize=(10, 5))
+
+    # Plot histograms
+    axs[0].hist(data_bins[:-1], data_bins, weights=data_hist, color="blue")
     axs[0].set_title(name)
-    axs[1].hist(ground_truth, bins=256, color="green", range=(0, 1))
+    axs[1].hist(gt_bins[:-1], gt_bins, weights=ground_truth_hist, color="green")
     axs[1].set_title(f"{name} Ground Truth")
+
     plt.tight_layout()
     # create the directory if it does not exist
     if not os.path.exists("img"):
@@ -509,7 +518,7 @@ for epoch in range(hyperparameters.num_epochs):
             valid_losses_batches = []
             with torch.no_grad():
                 model.eval()
-                for inputs, targets in val_dataloader:
+                for idx, (inputs, targets) in enumerate(val_dataloader):
                     # Add eventual noise to the inputs
                     if hyperparameters.noise_gaussian_std != 0:
                         inputs = add_gaussian_noise(inputs, hyperparameters.noise_gaussian_std)
@@ -523,8 +532,9 @@ for epoch in range(hyperparameters.num_epochs):
                     output = model(inputs)
 
                     loss = loss_fn(output, targets)
-                    if(PLOT_GRAPHS):
+                    if (PLOT_GRAPHS and idx == len(val_dataloader)-1):
                         plot_confusion_matrix(targets.detach().cpu().numpy().flatten().tolist(), torch.argmax(output, dim=1).detach().cpu().numpy().flatten().tolist(), step=step, name = "val")
+                        plot_img_label_output(inputs, targets, step, output=output, name="val")
                     # Multiply by len(x) because the final batch of DataLoader may be smaller (drop_last=False).
                     valid_accuracies_batches.append(IOU_accuracy(targets, output) * len(inputs))
                     valid_losses_batches.append(loss.item())
@@ -548,7 +558,7 @@ if TESTING:
     test_losses = []
     with torch.no_grad():
         model.eval()
-        for inputs, targets in test_dataloader:
+        for idx, (inputs, targets) in enumerate(test_dataloader):
             # Add eventual noise to the inputs
             if NOISE_ONLY_TESTING:
                 if temp_gaussian != 0:
@@ -570,8 +580,9 @@ if TESTING:
             loss = loss_fn(output, targets)
             test_accuracies.append(IOU_accuracy(targets, output))
             test_losses.append(loss.item())
-            if(PLOT_GRAPHS):
-                plot_confusion_matrix(targets.detach().cpu().numpy().flatten().tolist(),torch.argmax(output, dim=1).detach().cpu().numpy().flatten().tolist(), step=step, name="test")
+            if (PLOT_GRAPHS and idx == len(test_dataloader)-1):
+                plot_confusion_matrix(targets.detach().cpu().numpy().flatten().tolist(), torch.argmax(output, dim=1).detach().cpu().numpy().flatten().tolist(), step=step, name = "test")
+                plot_img_label_output(inputs, targets, step, output=output, name="test")
 
         print(f"Test accuracy: {np.mean(test_accuracies)}")
         print(f"Test loss: {np.mean(test_losses)}")

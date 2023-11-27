@@ -15,28 +15,31 @@ import seaborn as sns
 import random
 
 
-# HYPERPARAMETERS
+"""
+======================== HYPERPARAMETERS - START ========================
+In this section, we initialize and set all the hyperparameters used in the script."""
 
 class Hyperparameters:
     def __init__(self):
         """
-        # INFO about Noise parameters:
-        # - for Scenario 1 (no noise): set the noise parameters to 0
-        # - for Scenario 2 (noise only on Test inputs): set the noise parameters to 
-        #   the desired values and set NOISE_ONLY_TESTING to True
-        # - for Scenario 3 (noise on Train,Val,Test inputs): set the noise parameters to 
-        #   the desired values and set NOISE_ONLY_TESTING to False
+        # HOW TO SET THE NOISE PARAMETERS:
+        #
+        # - for Scenario 1 (no noise): set all the 3 noise parameters to 0
+        # - for Scenario 2 (noise only on Test inputs): set the single noise parameter to 
+        #   the desired value and set SCENARIO_2 = True
+        # - for Scenario 3 (noise on Train,Val,Test inputs): set the single noise parameter to 
+        #   the desired value and set SCENARIO_2 = False
         """
 
         self.batch_size = 1
         self.num_epochs = 1
-        self.val_freq = 500
+        self.val_freq = 1000
         self.learning_rate = 1e-4
         self.noise_gaussian_std = 0.00*255
         self.noise_salt_pepper_prob = 0.00
         self.noise_poisson_lambda = 0  # try values around 5 maybe
         self.seed = 20
-        self.config = 7
+        self.config = 99
 
     def display(self):
         print("Hyperparameters:")
@@ -49,28 +52,40 @@ class Hyperparameters:
 
 hyperparameters = Hyperparameters()
 
+"""
+======================== HYPERPARAMETERS - END ========================"""
+
+
+"""
+======================== CONTROL VARIABLES - START ========================
+In this section, we initialize and set all the control variables used in the script."""
+
+
 # DO NOT CHANGE THIS TO TRUE UNLESS YOU WANT TO GENERATE NEW DATASET FROM SCRATCH
 GENERATION = False
 
-# Set this to True if you want to test the model on the test set at the end of the training
-TESTING = False
-
 # for Scenario 2 set this to True, for Scenario 1 and Scenario 3 set this to False
-NOISE_ONLY_TESTING = False
+SCENARIO_2 = False
 
 # set to true if you want to plot graphs
 PLOT_GRAPHS = False
 
-if NOISE_ONLY_TESTING:
-    # Save the noise parameters in temporary variables to restore them in testing
-    temp_gaussian = hyperparameters.noise_gaussian_std
-    temp_salt_pepper = hyperparameters.noise_salt_pepper_prob
-    temp_poisson = hyperparameters.noise_poisson_lambda
+# set to true to save the model
+SAVE_MODEL = False
 
-    # Set the noise parameters to 0 to not add noise during training
-    hyperparameters.noise_gaussian_std = 0.00*255
-    hyperparameters.noise_salt_pepper_prob = 0.00
-    hyperparameters.noise_poisson_lambda = 0.00
+# Set this to True if you want to test the model on the test set at the end of the training
+TESTING = False
+
+# set to true to load the model
+LOAD_MODEL = False
+
+"""
+======================== CONTROL VARIABLES - END ========================"""
+
+
+"""
+======================== AUGMENTED DATASET GENERATION - START ========================
+In this section, we generate the augmented dataset and save it to the disk."""
 
 
 def random_crop(image, label, crop_size):
@@ -168,6 +183,16 @@ if GENERATION:
 
         print(f"Step {step} done")
         step += 1
+
+    print("Finished generating augmented data")
+
+
+"""
+======================== AUGMENTED DATASET GENERATION - END ========================"""
+
+"""
+======================== HELPER FUNCTIONS - START ========================
+In this section, we define all the helper functions used in the script."""
 
 
 def map_target_to_class(labels):
@@ -397,6 +422,14 @@ def add_poisson_noise(image_in, lam):
 
     return image_in
 
+"""
+======================== HELPER FUNCTIONS - END ========================"""
+
+
+"""
+======================== DATASET LOADING - START ========================
+In this section, we define the dataset class and split the data into train, validation and test sets."""
+
 
 class CustomSegmentationDataset(Dataset):
     def __init__(self, image_dir, mask_dir, transform):
@@ -440,128 +473,179 @@ test_size = len(dataset) - (train_size + val_size)
 random_seed = torch.Generator().manual_seed(hyperparameters.seed)
 train_dataset, val_dataset, test_dataset = random_split(dataset, [train_size, val_size, test_size], random_seed)
 
+if not LOAD_MODEL:
+    train_dataloader = DataLoader(train_dataset, shuffle=True, batch_size=hyperparameters.batch_size)
+    val_dataloader = DataLoader(val_dataset, shuffle=False, batch_size=hyperparameters.batch_size)
+if TESTING:
+    test_dataloader = DataLoader(test_dataset, shuffle=False, batch_size=hyperparameters.batch_size)
+
+"""
+======================== DATASET LOADING - END ========================"""
+
+
+"""
+======================== OPTIONS FOR TRAINING & TESTING  - START ========================
+In this section, we set some options for training and testing."""
+
+
+if SCENARIO_2:
+    # Save the noise parameters in temporary variables to restore them in testing
+    temp_gaussian = hyperparameters.noise_gaussian_std
+    temp_salt_pepper = hyperparameters.noise_salt_pepper_prob
+    temp_poisson = hyperparameters.noise_poisson_lambda
+
+    # Set the noise parameters to 0 to not add noise during training
+    hyperparameters.noise_gaussian_std = 0.00*255
+    hyperparameters.noise_salt_pepper_prob = 0.00
+    hyperparameters.noise_poisson_lambda = 0.00
+
 # Plot histograms
 if(PLOT_GRAPHS):
     plot_hist(train_dataset, name="Train Data")
     plot_hist(val_dataset, name="Validation Data")
-
-train_dataloader = DataLoader(train_dataset, shuffle=True, batch_size=hyperparameters.batch_size)
-val_dataloader = DataLoader(val_dataset, shuffle=False, batch_size=hyperparameters.batch_size)
-if TESTING:
-    if(PLOT_GRAPHS):
+    if TESTING:
         plot_hist(test_dataset, name="Test Data")
-    test_dataloader = DataLoader(test_dataset, shuffle=False, batch_size=hyperparameters.batch_size)
 
-# Create model
-print("Creating Model\n")
-hyperparameters.display()
+# put here because needed for testing
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-model = UNet_3Plus(in_channels=1, n_classes=3).to(device)
-
 loss_fn = smp.losses.DiceLoss(mode="multiclass", from_logits=True, smooth=1.0)
-optimizer = torch.optim.Adam(model.parameters(), lr=hyperparameters.learning_rate)
 
-step = 0
-model.train()
-
-train_accuracies = []
-valid_accuracies = []
-train_losses = []
-valid_losses = []
-
-steps = []
-
-current_time = time.time()
-
-for epoch in range(hyperparameters.num_epochs):
-    train_accuracies_batches = []
-    train_losses_batches = []
-
-    for inputs, targets in train_dataloader:
-        # Add eventual noise to the inputs
-        if hyperparameters.noise_gaussian_std != 0:
-            inputs = add_gaussian_noise(inputs, hyperparameters.noise_gaussian_std)
-        elif hyperparameters.noise_salt_pepper_prob != 0:
-            inputs = add_salt_pepper_noise(inputs, hyperparameters.noise_salt_pepper_prob)
-        elif hyperparameters.noise_poisson_lambda != 0:
-            inputs = add_poisson_noise(inputs, hyperparameters.noise_poisson_lambda)
-
-        inputs, targets = inputs.to(device), targets.to(device)
-
-        targets = map_target_to_class(targets)
-        output = model(inputs)
-        loss = loss_fn(output, targets)
-        # if step % VAL_EVERY_STEPS == 0:
-        #    print(f"loss = {loss}")
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-
-        # Increment step counter
-        step += 1
-
-        train_accuracies_batches.append(IOU_accuracy(targets, output))
-        train_losses_batches.append(loss.item())
-
-        if ((step <= 100 and step % 5 == 0) or (step % hyperparameters.val_freq == 0) or step == 0 or step == 1):
-
-            steps.append(step)
-
-            # Append average training accuracy to list.
-            train_accuracies.append(np.mean(train_accuracies_batches))
-            train_losses.append(np.mean(train_losses_batches))
-
-            train_accuracies_batches = []
-            train_losses_batches = []
-
-            # Compute accuracies on validation set.
-            valid_accuracies_batches = []
-            valid_losses_batches = []
-            with torch.no_grad():
-                model.eval()
-                for idx, (inputs, targets) in enumerate(val_dataloader):
-                    # Add eventual noise to the inputs
-                    if hyperparameters.noise_gaussian_std != 0:
-                        inputs = add_gaussian_noise(inputs, hyperparameters.noise_gaussian_std)
-                    elif hyperparameters.noise_salt_pepper_prob != 0:
-                        inputs = add_salt_pepper_noise(inputs, hyperparameters.noise_salt_pepper_prob)
-                    elif hyperparameters.noise_poisson_lambda != 0:
-                        inputs = add_poisson_noise(inputs, hyperparameters.noise_poisson_lambda)
-
-                    inputs, targets = inputs.to(device), targets.to(device)
-                    targets = map_target_to_class(targets)
-                    output = model(inputs)
-
-                    loss = loss_fn(output, targets)
-                    if (PLOT_GRAPHS and idx == len(val_dataloader)-1):
-                        plot_confusion_matrix(targets.detach().cpu().numpy().flatten().tolist(), torch.argmax(output, dim=1).detach().cpu().numpy().flatten().tolist(), step=step, name = "val")
-                        plot_img_label_output(inputs, targets, step, output=output, name="val")
-                    # Multiply by len(x) because the final batch of DataLoader may be smaller (drop_last=False).
-                    valid_accuracies_batches.append(IOU_accuracy(targets, output) * len(inputs))
-                    valid_losses_batches.append(loss.item())
-                model.train()
-
-            # Append average validation accuracy to list.
-            valid_accuracies.append(np.sum(valid_accuracies_batches) / len(val_dataset))
-            valid_losses.append(np.sum(valid_losses_batches) / len(val_dataset))
-
-            print(f"Step {step}  training accuracy: {train_accuracies[-1]}")
-            print(f"             validation accuracy: {valid_accuracies[-1]}")
-            print(f"             dice loss over the three classes: {loss}")
+"""
+======================== OPTIONS FOR TRAINING & TESTING  - END ========================"""
 
 
-current_time = time.time() - current_time
-print(f"Finished training. Took {current_time / 60} min")
-plot_train_val_loss_and_accuracy(train_losses, valid_losses, train_accuracies, valid_accuracies, steps)
+"""
+======================== TRAINING  - START ========================
+In this section, we train the model."""
+
+if not LOAD_MODEL:
+    # Create model
+    print("Creating Model\n")
+    hyperparameters.display()
+    model = UNet_3Plus(in_channels=1, n_classes=3).to(device)
+
+    optimizer = torch.optim.Adam(model.parameters(), lr=hyperparameters.learning_rate)
+
+    step = 0
+    model.train()
+
+    train_accuracies = []
+    valid_accuracies = []
+    train_losses = []
+    valid_losses = []
+
+    steps = []
+
+    current_time = time.time()
+
+    for epoch in range(hyperparameters.num_epochs):
+        train_accuracies_batches = []
+        train_losses_batches = []
+
+        for inputs, targets in train_dataloader:
+            # Add eventual noise to the inputs
+            if hyperparameters.noise_gaussian_std != 0:
+                inputs = add_gaussian_noise(inputs, hyperparameters.noise_gaussian_std)
+            elif hyperparameters.noise_salt_pepper_prob != 0:
+                inputs = add_salt_pepper_noise(inputs, hyperparameters.noise_salt_pepper_prob)
+            elif hyperparameters.noise_poisson_lambda != 0:
+                inputs = add_poisson_noise(inputs, hyperparameters.noise_poisson_lambda)
+
+            inputs, targets = inputs.to(device), targets.to(device)
+
+            targets = map_target_to_class(targets)
+            output = model(inputs)
+            loss = loss_fn(output, targets)
+            # if step % VAL_EVERY_STEPS == 0:
+            #    print(f"loss = {loss}")
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            # Increment step counter
+            step += 1
+
+            train_accuracies_batches.append(IOU_accuracy(targets, output))
+            train_losses_batches.append(loss.item())
+
+            if ((step <= 100 and step % 5 == 0) or (step % hyperparameters.val_freq == 0) or step == 0 or step == 1):
+
+                steps.append(step)
+
+                # Append average training accuracy to list.
+                train_accuracies.append(np.mean(train_accuracies_batches))
+                train_losses.append(np.mean(train_losses_batches))
+
+                train_accuracies_batches = []
+                train_losses_batches = []
+
+                # Compute accuracies on validation set.
+                valid_accuracies_batches = []
+                valid_losses_batches = []
+                with torch.no_grad():
+                    model.eval()
+                    for idx, (inputs, targets) in enumerate(val_dataloader):
+                        # Add eventual noise to the inputs
+                        if hyperparameters.noise_gaussian_std != 0:
+                            inputs = add_gaussian_noise(inputs, hyperparameters.noise_gaussian_std)
+                        elif hyperparameters.noise_salt_pepper_prob != 0:
+                            inputs = add_salt_pepper_noise(inputs, hyperparameters.noise_salt_pepper_prob)
+                        elif hyperparameters.noise_poisson_lambda != 0:
+                            inputs = add_poisson_noise(inputs, hyperparameters.noise_poisson_lambda)
+
+                        inputs, targets = inputs.to(device), targets.to(device)
+                        targets = map_target_to_class(targets)
+                        output = model(inputs)
+
+                        loss = loss_fn(output, targets)
+                        if (PLOT_GRAPHS and idx == len(val_dataloader)-1):
+                            plot_confusion_matrix(targets.detach().cpu().numpy().flatten().tolist(), torch.argmax(output, dim=1).detach().cpu().numpy().flatten().tolist(), step=step, name = "val")
+                            plot_img_label_output(inputs, targets, step, output=output, name="val")
+                        # Multiply by len(x) because the final batch of DataLoader may be smaller (drop_last=False).
+                        valid_accuracies_batches.append(IOU_accuracy(targets, output) * len(inputs))
+                        valid_losses_batches.append(loss.item())
+                    model.train()
+
+                # Append average validation accuracy to list.
+                valid_accuracies.append(np.sum(valid_accuracies_batches) / len(val_dataset))
+                valid_losses.append(np.sum(valid_losses_batches) / len(val_dataset))
+
+                print(f"Step {step}  training accuracy: {train_accuracies[-1]}")
+                print(f"             validation accuracy: {valid_accuracies[-1]}")
+                print(f"             dice loss over the three classes: {loss}")
+
+
+    current_time = time.time() - current_time
+    print(f"Finished training. Took {current_time / 60} min")
+    plot_train_val_loss_and_accuracy(train_losses, valid_losses, train_accuracies, valid_accuracies, steps)
+
+    if SAVE_MODEL:
+        print("Saving model")
+        torch.save(model, f"model_{hyperparameters.config}.pt")
+        print("Model saved")
+
+"""
+======================== TRAINING  - END ========================"""
+
+
+"""
+======================== TESTING  - START ========================
+In this section, we test the model."""
+
 
 if TESTING:
+    print("Testing model")
+    if LOAD_MODEL:
+        print("Loading model")
+        model = torch.load(f"model_{hyperparameters.config}.pt")
+        print("Model loaded")
     test_accuracies = []
     test_losses = []
     with torch.no_grad():
         model.eval()
         for idx, (inputs, targets) in enumerate(test_dataloader):
             # Add eventual noise to the inputs
-            if NOISE_ONLY_TESTING:
+            if SCENARIO_2:
                 if temp_gaussian != 0:
                     inputs = add_gaussian_noise(inputs, temp_gaussian)
                 elif temp_salt_pepper != 0:
@@ -587,3 +671,8 @@ if TESTING:
 
         print(f"Test accuracy: {np.mean(test_accuracies)}")
         print(f"Test loss: {np.mean(test_losses)}")
+
+"""
+======================== TESTING  - END ========================"""
+
+

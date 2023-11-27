@@ -35,7 +35,7 @@ class Hyperparameters:
         self.num_epochs = 1
         self.val_freq = 1000
         self.learning_rate = 1e-4
-        self.noise_gaussian_std = 0.05 # percentage of pixel range
+        self.noise_gaussian_std = 0.40 # percentage of pixel range
         self.noise_salt_pepper_prob = 0.00
         self.noise_poisson_lambda = 0  # try values around 5 maybe
         self.seed = 20
@@ -68,7 +68,7 @@ GENERATION = False
 SCENARIO_2 = False
 
 # set to true if you want to plot graphs
-PLOT_GRAPHS = False
+PLOT_GRAPHS = True
 
 # set to true to save the model
 SAVE_MODEL = False
@@ -254,11 +254,11 @@ def plot_img_label_output(org_image, ground_truth, step, name, output=None):
     :param name: Name of the saved image
     :return: None
     """
-    org_image = org_image.detach().cpu().squeeze().numpy()
-    ground_truth = ground_truth.detach().cpu().squeeze().numpy()
+    org_image = org_image[0].detach().cpu().squeeze().numpy()
+    ground_truth = ground_truth[0].detach().cpu().squeeze().numpy()
 
     if output is not None:
-        output = torch.argmax(output, dim=1).detach().cpu().squeeze().numpy()
+        output = torch.argmax(output[0], dim=0).detach().cpu().squeeze().numpy()
         fig, axs = plt.subplots(1, 3)
     else:
         fig, axs = plt.subplots(1, 2)

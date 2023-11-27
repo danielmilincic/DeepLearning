@@ -31,11 +31,11 @@ class Hyperparameters:
         #   the desired value and set SCENARIO_2 = False
         """
 
-        self.batch_size = 1
+        self.batch_size = 2
         self.num_epochs = 1
         self.val_freq = 1000
         self.learning_rate = 1e-4
-        self.noise_gaussian_std = 0.00*255
+        self.noise_gaussian_std = 0.05 # percentage of pixel range
         self.noise_salt_pepper_prob = 0.00
         self.noise_poisson_lambda = 0  # try values around 5 maybe
         self.seed = 20
@@ -371,11 +371,15 @@ def load_images_from_directory(directory):
 
 
 def add_gaussian_noise(image_in, noise_sigma):
+    min = image_in.detach().cpu().numpy().min()
+    max = image_in.detach().cpu().numpy().max()
+    range = max - min
+    std = noise_sigma * range
     mean = 0
-    gaussian = np.random.normal(mean, noise_sigma, image_in.shape)
+    gaussian = np.random.normal(mean, std, image_in.shape)
     image_in = image_in + gaussian
     image_in[image_in < 0] = 0
-    image_in[image_in > 255] = 255
+    image_in[image_in > 1] = 1
 
     # Convert image to float
     image_in = image_in.float()

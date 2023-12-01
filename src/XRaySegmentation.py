@@ -35,11 +35,11 @@ class Hyperparameters:
         self.num_epochs = 1
         self.val_freq = 10
         self.learning_rate = 1e-5
-        self.noise_gaussian_std = 0.06 # percentage of pixel range
+        self.noise_gaussian_std = 0.17 # percentage of pixel range
         self.noise_salt_pepper_prob = 0.00
         self.noise_poisson_lambda = 0  # try values around 5 maybe
         self.seed = 20
-        self.config = 99
+        self.config = 2
 
     def display(self):
         print("Hyperparameters:")
@@ -65,19 +65,19 @@ In this section, we initialize and set all the control variables used in the scr
 GENERATION = False
 
 # for Scenario 2 set this to True, for Scenario 1 and Scenario 3 set this to False
-SCENARIO_2 = True
+SCENARIO_2 = False
 
 # set to true if you want to plot graphs
 PLOT_GRAPHS = True
 
 # set to true to save the model
-SAVE_MODEL = True
+SAVE_MODEL = False
 
 # set this to True if you want to test the model on the test set at the end of the training
 TESTING = True
 
 # set to true to load the model
-LOAD_MODEL = True
+LOAD_MODEL = False
 
 DTU_BLUE = '#2f3eea'
 ORNAGE = '#FFAE4A'
@@ -279,7 +279,8 @@ def plot_img_label_output(org_image, ground_truth, step, name, output=None):
     # create the directory if it does not exist
     if not os.path.exists("img"):
         os.mkdir("img")
-    plt.savefig(f"img/conf_{hyperparameters.config}_{name}_images_{step}.svg")
+    plt.tight_layout()
+    plt.savefig(f"img/conf_{hyperparameters.config}_{name}_images_{step}.svg", format = 'svg', bbox_inches='tight')
     plt.close()
 
 
@@ -292,6 +293,7 @@ def plot_train_val_loss_and_accuracy(train_loss, val_loss, train_acc, val_acc, s
     plt.title('IOU Accuracy', fontsize='large')
     plt.xlabel('Step', fontsize='large')
     # plt.ylabel('IOU Accuracy', fontsize='large')
+    plt.ylim([0,1])
     plt.legend(fontsize='large')  
 
     plt.subplot(1, 2, 2)
@@ -306,7 +308,7 @@ def plot_train_val_loss_and_accuracy(train_loss, val_loss, train_acc, val_acc, s
     # create the directory if it does not exist
     if not os.path.exists("img"):
         os.mkdir("img")
-    plt.savefig(f"img/conf_{hyperparameters.config}_train_val_metric.svg")
+    plt.savefig(f"img/conf_{hyperparameters.config}_train_val_metric.svg", format='svg', bbox_inches='tight')
 
 
 def plot_confusion_matrix(ground_truth, predictions, step, name):
@@ -320,7 +322,8 @@ def plot_confusion_matrix(ground_truth, predictions, step, name):
     # create the directory if it does not exist
     if not os.path.exists("img"):
         os.mkdir("img")
-    plt.savefig(f"img/conf_{hyperparameters.config}_{name}_confmatrix_step_{step}.svg")
+    plt.tight_layout()
+    plt.savefig(f"img/conf_{hyperparameters.config}_{name}_confmatrix_step_{step}.svg", format='svg', bbox_inches='tight')
     plt.close()
 
 
@@ -636,7 +639,7 @@ if not LOAD_MODEL:
 
     if SAVE_MODEL:
         print("Saving model")
-        torch.save(model, f"model_{hyperparameters.config}.pt")
+        torch.save(model, f"model_2.pt")
         print("Model saved")
 
 """
@@ -652,7 +655,7 @@ if TESTING:
     print("Testing model")
     if LOAD_MODEL:
         print("Loading model")
-        model = torch.load(f"model_{hyperparameters.config}.pt")
+        model = torch.load(f"model_2.pt")
         print("Model loaded")
     test_accuracies = []
     test_losses = []

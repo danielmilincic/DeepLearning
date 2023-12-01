@@ -35,7 +35,7 @@ class Hyperparameters:
         self.num_epochs = 1
         self.val_freq = 10
         self.learning_rate = 1e-5
-        self.noise_gaussian_std = 0 # percentage of pixel range
+        self.noise_gaussian_std = 0.06 # percentage of pixel range
         self.noise_salt_pepper_prob = 0.00
         self.noise_poisson_lambda = 0  # try values around 5 maybe
         self.seed = 20
@@ -65,7 +65,7 @@ In this section, we initialize and set all the control variables used in the scr
 GENERATION = False
 
 # for Scenario 2 set this to True, for Scenario 1 and Scenario 3 set this to False
-SCENARIO_2 = False
+SCENARIO_2 = True
 
 # set to true if you want to plot graphs
 PLOT_GRAPHS = True
@@ -267,14 +267,14 @@ def plot_img_label_output(org_image, ground_truth, step, name, output=None):
         fig, axs = plt.subplots(1, 2)
 
     axs[0].imshow(org_image, cmap=coastal_breeze_cmap)
-    axs[0].set_title("Image")
+    axs[0].set_title("Original")
     axs[0].axis('off')
     axs[1].imshow(ground_truth, cmap=coastal_breeze_cmap)
     axs[1].set_title("Label")
     axs[1].axis('off')
     if output is not None:
         axs[2].imshow(output, cmap=coastal_breeze_cmap)
-        axs[2].set_title("Output")
+        axs[2].set_title("Prediction")
         axs[2].axis('off')
     # create the directory if it does not exist
     if not os.path.exists("img"):
@@ -314,9 +314,9 @@ def plot_confusion_matrix(ground_truth, predictions, step, name):
     class_labels = ["C0", "C1", "C2"]
     plt.figure(figsize=(10, 7))
     sns.heatmap(cm, annot=True, cmap='Blues', xticklabels=class_labels, yticklabels=class_labels)
-    plt.xlabel('Model Output')
-    plt.ylabel('Ground Truth')
-    plt.title("Confusion Matrix")
+    plt.xlabel('Prediction', fontsize = 'large')
+    plt.ylabel('Label', fontsize = 'large')
+    plt.title("Confusion Matrix", fontsize = 'large')
     # create the directory if it does not exist
     if not os.path.exists("img"):
         os.mkdir("img")

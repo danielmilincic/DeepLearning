@@ -24,18 +24,18 @@ class Hyperparameters:
         """
         # HOW TO SET THE NOISE PARAMETERS:
         #
-        # - for Scenario 1 (no noise): set all the 3 noise parameters to 0
+        # - for Scenario 1 (no noise): set all the 3 noise parameters to 0 and SCENARIO_2 = False
         # - for Scenario 2 (noise only on Test inputs): set the single noise parameter to 
         #   the desired value and set SCENARIO_2 = True
         # - for Scenario 3 (noise on Train,Val,Test inputs): set the single noise parameter to 
         #   the desired value and set SCENARIO_2 = False
         """
 
-        self.batch_size = 2
-        self.num_epochs = 1
-        self.val_freq = 1000
-        self.learning_rate = 1e-4
-        self.noise_gaussian_std = 0.40 # percentage of pixel range
+        self.batch_size = 8
+        self.num_epochs = 2
+        self.val_freq = 4
+        self.learning_rate = 1e-6
+        self.noise_gaussian_std = 1.5 # percentage of pixel range
         self.noise_salt_pepper_prob = 0.00
         self.noise_poisson_lambda = 0  # try values around 5 maybe
         self.seed = 20
@@ -74,7 +74,7 @@ PLOT_GRAPHS = True
 SAVE_MODEL = False
 
 # Set this to True if you want to test the model on the test set at the end of the training
-TESTING = False
+TESTING = True
 
 # set to true to load the model
 LOAD_MODEL = False
@@ -276,7 +276,7 @@ def plot_img_label_output(org_image, ground_truth, step, name, output=None):
     # create the directory if it does not exist
     if not os.path.exists("img"):
         os.mkdir("img")
-    plt.savefig(f"img/conf_{hyperparameters.config}_{name}_images_{step}.png")
+    plt.savefig(f"img/conf_{hyperparameters.config}_{name}_images_{step}.svg")
     plt.close()
 
 
@@ -302,21 +302,21 @@ def plot_train_val_loss_and_accuracy(train_loss, val_loss, train_acc, val_acc, s
     # create the directory if it does not exist
     if not os.path.exists("img"):
         os.mkdir("img")
-    plt.savefig(f"img/conf_{hyperparameters.config}_train_val_metric.png")
+    plt.savefig(f"img/conf_{hyperparameters.config}_train_val_metric.svg")
 
 
 def plot_confusion_matrix(ground_truth, predictions, step, name):
     cm = confusion_matrix(ground_truth, predictions, labels=[0, 1, 2], normalize="true")
     class_labels = ["C0", "C1", "C2"]
     plt.figure(figsize=(10, 7))
-    sns.heatmap(cm, annot=True, cmap='Blues', xticklabels=class_labels, yticklabels=class_labels)
+    sns.heatmap(cm, annot=True, cmap='magma', xticklabels=class_labels, yticklabels=class_labels)
     plt.xlabel('Model Output')
     plt.ylabel('Ground Truth')
     plt.title("Confusion Matrix")
     # create the directory if it does not exist
     if not os.path.exists("img"):
         os.mkdir("img")
-    plt.savefig(f"img/conf_{hyperparameters.config}_{name}_confmatrix_step_{step}.png")
+    plt.savefig(f"img/conf_{hyperparameters.config}_{name}_confmatrix_step_{step}.svg")
     plt.close()
 
 

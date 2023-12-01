@@ -32,10 +32,10 @@ class Hyperparameters:
         """
 
         self.batch_size = 8
-        self.num_epochs = 2
-        self.val_freq = 4
-        self.learning_rate = 1e-6
-        self.noise_gaussian_std = 1.5 # percentage of pixel range
+        self.num_epochs = 1
+        self.val_freq = 10
+        self.learning_rate = 1e-5
+        self.noise_gaussian_std = 0 # percentage of pixel range
         self.noise_salt_pepper_prob = 0.00
         self.noise_poisson_lambda = 0  # try values around 5 maybe
         self.seed = 20
@@ -71,13 +71,16 @@ SCENARIO_2 = False
 PLOT_GRAPHS = True
 
 # set to true to save the model
-SAVE_MODEL = False
+SAVE_MODEL = True
 
-# Set this to True if you want to test the model on the test set at the end of the training
+# set this to True if you want to test the model on the test set at the end of the training
 TESTING = True
 
 # set to true to load the model
 LOAD_MODEL = False
+
+DTU_BLUE = '#2f3eea'
+ORNAGE = '#FFAE4A'
 
 """
 ======================== CONTROL VARIABLES - END ========================"""
@@ -263,14 +266,14 @@ def plot_img_label_output(org_image, ground_truth, step, name, output=None):
     else:
         fig, axs = plt.subplots(1, 2)
 
-    axs[0].imshow(org_image, cmap="magma")
+    axs[0].imshow(org_image, cmap=coastal_breeze_cmap)
     axs[0].set_title("Image")
     axs[0].axis('off')
-    axs[1].imshow(ground_truth, cmap="magma")
+    axs[1].imshow(ground_truth, cmap=coastal_breeze_cmap)
     axs[1].set_title("Label")
     axs[1].axis('off')
     if output is not None:
-        axs[2].imshow(output, cmap="magma")
+        axs[2].imshow(output, cmap=coastal_breeze_cmap)
         axs[2].set_title("Output")
         axs[2].axis('off')
     # create the directory if it does not exist
@@ -281,22 +284,23 @@ def plot_img_label_output(org_image, ground_truth, step, name, output=None):
 
 
 def plot_train_val_loss_and_accuracy(train_loss, val_loss, train_acc, val_acc, steps):
+
     plt.figure(figsize=(12, 5))
     plt.subplot(1, 2, 1)
-    plt.plot(steps, train_acc, 'b-', label='Training Accuracy')
-    plt.plot(steps, val_acc, 'r-', label='Validation Accuracy')
-    plt.title('Training and Validation Accuracy')
-    plt.xlabel('Step')
-    plt.ylabel('Accuracy')
-    plt.legend()
+    plt.plot(steps, train_acc, color=DTU_BLUE, label=' Training')
+    plt.plot(steps, val_acc, color=ORNAGE, label='Validation')
+    plt.title('IOU Accuracy', fontsize='large')
+    plt.xlabel('Step', fontsize='large')
+    # plt.ylabel('IOU Accuracy', fontsize='large')
+    plt.legend(fontsize='large')  
 
     plt.subplot(1, 2, 2)
-    plt.plot(steps, train_loss, 'b-', label='Training Loss')
-    plt.plot(steps, val_loss, 'r-', label='Validation Loss')
-    plt.title('Training and Validation Loss')
-    plt.xlabel('Step')
-    plt.ylabel('Loss')
-    plt.legend()
+    plt.plot(steps, train_loss, color=DTU_BLUE, linestyle='-',  label='Training')
+    plt.plot(steps, val_loss, color=ORNAGE, label='Validation')
+    plt.title('DICE Loss', fontsize='large')
+    plt.xlabel('Step', fontsize='large')
+    # plt.ylabel('DICE Loss', fontsize='large')
+    plt.legend(fontsize='large')  
 
     plt.tight_layout()
     # create the directory if it does not exist
@@ -309,7 +313,7 @@ def plot_confusion_matrix(ground_truth, predictions, step, name):
     cm = confusion_matrix(ground_truth, predictions, labels=[0, 1, 2], normalize="true")
     class_labels = ["C0", "C1", "C2"]
     plt.figure(figsize=(10, 7))
-    sns.heatmap(cm, annot=True, cmap='magma', xticklabels=class_labels, yticklabels=class_labels)
+    sns.heatmap(cm, annot=True, cmap='Blues', xticklabels=class_labels, yticklabels=class_labels)
     plt.xlabel('Model Output')
     plt.ylabel('Ground Truth')
     plt.title("Confusion Matrix")
@@ -464,6 +468,13 @@ data_directory = "new_data/"
 label_directory = "new_labels/"
 data = load_images_from_directory(data_directory)
 labels = load_images_from_directory(label_directory)
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
+
+# Define the Coastal Breeze colormap
+colors = ['#FFAE4A', '#45B7C2','#2f3eea'] 
+coastal_breeze_cmap = mcolors.LinearSegmentedColormap.from_list(name='coastal_breeze_cmap', colors=colors)
 
 tranform_toTensor = transforms.ToTensor()
 
@@ -504,11 +515,11 @@ if SCENARIO_2:
     hyperparameters.noise_poisson_lambda = 0.00
 
 # Plot histograms
-if(PLOT_GRAPHS):
-    plot_hist(train_dataset, name="Train Data")
-    plot_hist(val_dataset, name="Validation Data")
-    if TESTING:
-        plot_hist(test_dataset, name="Test Data")
+# if(PLOT_GRAPHS):
+    # plot_hist(train_dataset, name="Train Data")
+    # plot_hist(val_dataset, name="Validation Data")
+    # if TESTING:
+        # plot_hist(test_dataset, name="Test Data")
 
 # put here because needed for testing
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -572,7 +583,7 @@ if not LOAD_MODEL:
             train_accuracies_batches.append(IOU_accuracy(targets, output))
             train_losses_batches.append(loss.item())
 
-            if ((step <= 100 and step % 5 == 0) or (step % hyperparameters.val_freq == 0) or step == 0 or step == 1):
+            if ((step <= 100 and step % 5 == 0) or (step % hyperparameters.val_freq == 0 and step >= 100) or step == 0 or step == 1):
 
                 steps.append(step)
 

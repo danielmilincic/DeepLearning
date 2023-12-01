@@ -77,7 +77,7 @@ SAVE_MODEL = True
 TESTING = True
 
 # set to true to load the model
-LOAD_MODEL = False
+LOAD_MODEL = True
 
 DTU_BLUE = '#2f3eea'
 ORNAGE = '#FFAE4A'
@@ -658,6 +658,8 @@ if TESTING:
     test_losses = []
     with torch.no_grad():
         model.eval()
+        all_targets = []
+        all_predictions = []
         for idx, (inputs, targets) in enumerate(test_dataloader):
             # Add eventual noise to the inputs
             if SCENARIO_2:
@@ -681,9 +683,14 @@ if TESTING:
             test_accuracies.append(IOU_accuracy(targets, output))
             test_losses.append(loss.item())
             if (PLOT_GRAPHS and idx == len(test_dataloader)-1):
-                plot_confusion_matrix(targets.detach().cpu().numpy().flatten().tolist(), torch.argmax(output, dim=1).detach().cpu().numpy().flatten().tolist(), step=step, name = "test")
-                plot_img_label_output(inputs, targets, step, output=output, name="test")
+                all_targets.extend(targets.detach().cpu().numpy().flatten().tolist())
+                all_predictions.extend(torch.argmax(output, dim=1).detach().cpu().numpy().flatten().tolist())
+                if idx == len(test_dataloader)-1:
+                    plot_img_label_output(inputs, targets, idx, output=output, name="test")
 
+
+        if PLOT_GRAPHS:
+            plot_confusion_matrix(all_targets, all_predictions, step=0, name="test")     
         print(f"Test accuracy: {np.mean(test_accuracies)}")
         print(f"Test loss: {np.mean(test_losses)}")
 

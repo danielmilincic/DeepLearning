@@ -24,18 +24,18 @@ class Hyperparameters:
         """
         # HOW TO SET THE NOISE PARAMETERS:
         #
-        # - for Scenario 1 (no noise): set all the 3 noise parameters to 0
+        # - for Scenario 1 (no noise): set all the 3 noise parameters to 0 and SCENARIO_2 = False
         # - for Scenario 2 (noise only on Test inputs): set the single noise parameter to 
         #   the desired value and set SCENARIO_2 = True
         # - for Scenario 3 (noise on Train,Val,Test inputs): set the single noise parameter to 
         #   the desired value and set SCENARIO_2 = False
         """
 
-        self.batch_size = 2
+        self.batch_size = 8
         self.num_epochs = 1
-        self.val_freq = 1000
-        self.learning_rate = 1e-4
-        self.noise_gaussian_std = 0.40 # percentage of pixel range
+        self.val_freq = 10
+        self.learning_rate = 1e-5
+        self.noise_gaussian_std = 0.06 # percentage of pixel range
         self.noise_salt_pepper_prob = 0.00
         self.noise_poisson_lambda = 0  # try values around 5 maybe
         self.seed = 20
@@ -65,19 +65,22 @@ In this section, we initialize and set all the control variables used in the scr
 GENERATION = False
 
 # for Scenario 2 set this to True, for Scenario 1 and Scenario 3 set this to False
-SCENARIO_2 = False
+SCENARIO_2 = True
 
 # set to true if you want to plot graphs
 PLOT_GRAPHS = True
 
 # set to true to save the model
-SAVE_MODEL = False
+SAVE_MODEL = True
 
-# Set this to True if you want to test the model on the test set at the end of the training
-TESTING = False
+# set this to True if you want to test the model on the test set at the end of the training
+TESTING = True
 
 # set to true to load the model
-LOAD_MODEL = False
+LOAD_MODEL = True
+
+DTU_BLUE = '#2f3eea'
+ORNAGE = '#FFAE4A'
 
 """
 ======================== CONTROL VARIABLES - END ========================"""
@@ -263,46 +266,47 @@ def plot_img_label_output(org_image, ground_truth, step, name, output=None):
     else:
         fig, axs = plt.subplots(1, 2)
 
-    axs[0].imshow(org_image, cmap="magma")
-    axs[0].set_title("Image")
+    axs[0].imshow(org_image, cmap=coastal_breeze_cmap)
+    axs[0].set_title("Original")
     axs[0].axis('off')
-    axs[1].imshow(ground_truth, cmap="magma")
+    axs[1].imshow(ground_truth, cmap=coastal_breeze_cmap)
     axs[1].set_title("Label")
     axs[1].axis('off')
     if output is not None:
-        axs[2].imshow(output, cmap="magma")
-        axs[2].set_title("Output")
+        axs[2].imshow(output, cmap=coastal_breeze_cmap)
+        axs[2].set_title("Prediction")
         axs[2].axis('off')
     # create the directory if it does not exist
     if not os.path.exists("img"):
         os.mkdir("img")
-    plt.savefig(f"img/conf_{hyperparameters.config}_{name}_images_{step}.png")
+    plt.savefig(f"img/conf_{hyperparameters.config}_{name}_images_{step}.svg")
     plt.close()
 
 
 def plot_train_val_loss_and_accuracy(train_loss, val_loss, train_acc, val_acc, steps):
+
     plt.figure(figsize=(12, 5))
     plt.subplot(1, 2, 1)
-    plt.plot(steps, train_acc, 'b-', label='Training Accuracy')
-    plt.plot(steps, val_acc, 'r-', label='Validation Accuracy')
-    plt.title('Training and Validation Accuracy')
-    plt.xlabel('Step')
-    plt.ylabel('Accuracy')
-    plt.legend()
+    plt.plot(steps, train_acc, color=DTU_BLUE, label=' Training')
+    plt.plot(steps, val_acc, color=ORNAGE, label='Validation')
+    plt.title('IOU Accuracy', fontsize='large')
+    plt.xlabel('Step', fontsize='large')
+    # plt.ylabel('IOU Accuracy', fontsize='large')
+    plt.legend(fontsize='large')  
 
     plt.subplot(1, 2, 2)
-    plt.plot(steps, train_loss, 'b-', label='Training Loss')
-    plt.plot(steps, val_loss, 'r-', label='Validation Loss')
-    plt.title('Training and Validation Loss')
-    plt.xlabel('Step')
-    plt.ylabel('Loss')
-    plt.legend()
+    plt.plot(steps, train_loss, color=DTU_BLUE, linestyle='-',  label='Training')
+    plt.plot(steps, val_loss, color=ORNAGE, label='Validation')
+    plt.title('DICE Loss', fontsize='large')
+    plt.xlabel('Step', fontsize='large')
+    # plt.ylabel('DICE Loss', fontsize='large')
+    plt.legend(fontsize='large')  
 
     plt.tight_layout()
     # create the directory if it does not exist
     if not os.path.exists("img"):
         os.mkdir("img")
-    plt.savefig(f"img/conf_{hyperparameters.config}_train_val_metric.png")
+    plt.savefig(f"img/conf_{hyperparameters.config}_train_val_metric.svg")
 
 
 def plot_confusion_matrix(ground_truth, predictions, step, name):
@@ -310,13 +314,13 @@ def plot_confusion_matrix(ground_truth, predictions, step, name):
     class_labels = ["C0", "C1", "C2"]
     plt.figure(figsize=(10, 7))
     sns.heatmap(cm, annot=True, cmap='Blues', xticklabels=class_labels, yticklabels=class_labels)
-    plt.xlabel('Model Output')
-    plt.ylabel('Ground Truth')
-    plt.title("Confusion Matrix")
+    plt.xlabel('Prediction', fontsize = 'large')
+    plt.ylabel('Label', fontsize = 'large')
+    plt.title("Confusion Matrix", fontsize = 'large')
     # create the directory if it does not exist
     if not os.path.exists("img"):
         os.mkdir("img")
-    plt.savefig(f"img/conf_{hyperparameters.config}_{name}_confmatrix_step_{step}.png")
+    plt.savefig(f"img/conf_{hyperparameters.config}_{name}_confmatrix_step_{step}.svg")
     plt.close()
 
 
@@ -464,6 +468,13 @@ data_directory = "new_data/"
 label_directory = "new_labels/"
 data = load_images_from_directory(data_directory)
 labels = load_images_from_directory(label_directory)
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
+
+# Define the Coastal Breeze colormap
+colors = ['#FFAE4A', '#45B7C2','#2f3eea'] 
+coastal_breeze_cmap = mcolors.LinearSegmentedColormap.from_list(name='coastal_breeze_cmap', colors=colors)
 
 tranform_toTensor = transforms.ToTensor()
 
@@ -504,11 +515,11 @@ if SCENARIO_2:
     hyperparameters.noise_poisson_lambda = 0.00
 
 # Plot histograms
-if(PLOT_GRAPHS):
-    plot_hist(train_dataset, name="Train Data")
-    plot_hist(val_dataset, name="Validation Data")
-    if TESTING:
-        plot_hist(test_dataset, name="Test Data")
+# if(PLOT_GRAPHS):
+    # plot_hist(train_dataset, name="Train Data")
+    # plot_hist(val_dataset, name="Validation Data")
+    # if TESTING:
+        # plot_hist(test_dataset, name="Test Data")
 
 # put here because needed for testing
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -572,7 +583,7 @@ if not LOAD_MODEL:
             train_accuracies_batches.append(IOU_accuracy(targets, output))
             train_losses_batches.append(loss.item())
 
-            if ((step <= 100 and step % 5 == 0) or (step % hyperparameters.val_freq == 0) or step == 0 or step == 1):
+            if ((step <= 100 and step % 5 == 0) or (step % hyperparameters.val_freq == 0 and step >= 100) or step == 0 or step == 1):
 
                 steps.append(step)
 
@@ -647,6 +658,8 @@ if TESTING:
     test_losses = []
     with torch.no_grad():
         model.eval()
+        all_targets = []
+        all_predictions = []
         for idx, (inputs, targets) in enumerate(test_dataloader):
             # Add eventual noise to the inputs
             if SCENARIO_2:
@@ -670,9 +683,14 @@ if TESTING:
             test_accuracies.append(IOU_accuracy(targets, output))
             test_losses.append(loss.item())
             if (PLOT_GRAPHS and idx == len(test_dataloader)-1):
-                plot_confusion_matrix(targets.detach().cpu().numpy().flatten().tolist(), torch.argmax(output, dim=1).detach().cpu().numpy().flatten().tolist(), step=step, name = "test")
-                plot_img_label_output(inputs, targets, step, output=output, name="test")
+                all_targets.extend(targets.detach().cpu().numpy().flatten().tolist())
+                all_predictions.extend(torch.argmax(output, dim=1).detach().cpu().numpy().flatten().tolist())
+                if idx == len(test_dataloader)-1:
+                    plot_img_label_output(inputs, targets, idx, output=output, name="test")
 
+
+        if PLOT_GRAPHS:
+            plot_confusion_matrix(all_targets, all_predictions, step=0, name="test")     
         print(f"Test accuracy: {np.mean(test_accuracies)}")
         print(f"Test loss: {np.mean(test_losses)}")
 

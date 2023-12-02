@@ -6,4 +6,4 @@ __pycache__/
 /img/
 /new_data/
 /new_labels/
-
+model_99.pt

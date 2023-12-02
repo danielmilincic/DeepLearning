@@ -280,7 +280,7 @@ def plot_img_label_output(org_image, ground_truth, step, name, output=None):
     if not os.path.exists("img"):
         os.mkdir("img")
     plt.tight_layout()
-    plt.savefig(f"img/conf_{hyperparameters.config}_{name}_images_{step}.pdf", format = 'pdf', bbox_inches='tight')
+    plt.savefig(f"img/conf_{hyperparameters.config}_{name}_images_{step}.png", format = 'png', bbox_inches='tight', dpi = 400)
     plt.close()
 
 
@@ -308,7 +308,7 @@ def plot_train_val_loss_and_accuracy(train_loss, val_loss, train_acc, val_acc, s
     # create the directory if it does not exist
     if not os.path.exists("img"):
         os.mkdir("img")
-    plt.savefig(f"img/conf_{hyperparameters.config}_train_val_metric.pdf", format='pdf', bbox_inches='tight')
+    plt.savefig(f"img/conf_{hyperparameters.config}_train_val_metric.png", format='png', bbox_inches='tight', dpi = 400)
 
 
 def plot_confusion_matrix(ground_truth, predictions, step, name):
@@ -324,9 +324,9 @@ def plot_confusion_matrix(ground_truth, predictions, step, name):
         os.mkdir("img")
     plt.tight_layout()
     if name == 'test': 
-        plt.savefig(f"img/conf_{hyperparameters.config}_{name}_confmatrix.pdf", format='pdf', bbox_inches='tight')
+        plt.savefig(f"img/conf_{hyperparameters.config}_{name}_confmatrix.png", format='png', bbox_inches='tight', dpi = 400)
     else:
-        plt.savefig(f"img/conf_{hyperparameters.config}_{name}_confmatrix_step_{step}.pdf", format='pdf', bbox_inches='tight')
+        plt.savefig(f"img/conf_{hyperparameters.config}_{name}_confmatrix_step_{step}.png", format='png', bbox_inches='tight', dpi=400)
     plt.close()
 
 
@@ -363,7 +363,7 @@ def plot_hist(data, name):
     # create the directory if it does not exist
     if not os.path.exists("img"):
         os.mkdir("img")
-    plt.savefig(f"img/conf_{hyperparameters.config}_{name}_hist.png")
+    plt.savefig(f"img/conf_{hyperparameters.config}_{name}_hist.png", dpi=400)
     plt.close()
 
 def get_image_files(data_path):

@@ -35,11 +35,11 @@ class Hyperparameters:
         self.num_epochs = 1
         self.val_freq = 10
         self.learning_rate = 1e-5
-        self.noise_gaussian_std = 0.17
+        self.noise_gaussian_std = 0.00
         self.noise_salt_pepper_prob = 0.00
         self.noise_poisson_lambda = 0  # try values around 5 maybe
         self.seed = 20
-        self.config = 2
+        self.config = 21
 
     def display(self):
         print("Hyperparameters:")
@@ -68,7 +68,7 @@ GENERATION = False
 SCENARIO_2 = True
 
 # set to true if you want to plot graphs
-PLOT_GRAPHS = True
+PLOT_GRAPHS = False
 
 # set to true to save the model
 SAVE_MODEL = False
@@ -413,15 +413,12 @@ def add_salt_pepper_noise(image_in, salt_pepper_prob):
     flat_image = image_in.view(-1)
 
     # Add salt and pepper noise
-    flat_image[salt_coords] = 255
+    flat_image[salt_coords] = 1
     flat_image[pepper_coords] = 0
 
     # Reshape the image to its original shape
     image_in = flat_image.view(image_in.shape)
-
-    # Convert image to float
-    image_in = image_in.float()
-
+    
     return image_in
 
 

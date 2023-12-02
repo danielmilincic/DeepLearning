@@ -35,11 +35,11 @@ class Hyperparameters:
         self.num_epochs = 1
         self.val_freq = 10
         self.learning_rate = 1e-5
-        self.noise_gaussian_std = 0.06 # percentage of pixel range
+        self.noise_gaussian_std = 0.17
         self.noise_salt_pepper_prob = 0.00
         self.noise_poisson_lambda = 0  # try values around 5 maybe
         self.seed = 20
-        self.config = 99
+        self.config = 2
 
     def display(self):
         print("Hyperparameters:")
@@ -71,7 +71,7 @@ SCENARIO_2 = True
 PLOT_GRAPHS = True
 
 # set to true to save the model
-SAVE_MODEL = True
+SAVE_MODEL = False
 
 # set this to True if you want to test the model on the test set at the end of the training
 TESTING = True
@@ -279,7 +279,8 @@ def plot_img_label_output(org_image, ground_truth, step, name, output=None):
     # create the directory if it does not exist
     if not os.path.exists("img"):
         os.mkdir("img")
-    plt.savefig(f"img/conf_{hyperparameters.config}_{name}_images_{step}.svg")
+    plt.tight_layout()
+    plt.savefig(f"img/conf_{hyperparameters.config}_{name}_images_{step}.pdf", format = 'pdf', bbox_inches='tight')
     plt.close()
 
 
@@ -292,6 +293,7 @@ def plot_train_val_loss_and_accuracy(train_loss, val_loss, train_acc, val_acc, s
     plt.title('IOU Accuracy', fontsize='large')
     plt.xlabel('Step', fontsize='large')
     # plt.ylabel('IOU Accuracy', fontsize='large')
+    plt.ylim([0,1])
     plt.legend(fontsize='large')  
 
     plt.subplot(1, 2, 2)
@@ -306,7 +308,7 @@ def plot_train_val_loss_and_accuracy(train_loss, val_loss, train_acc, val_acc, s
     # create the directory if it does not exist
     if not os.path.exists("img"):
         os.mkdir("img")
-    plt.savefig(f"img/conf_{hyperparameters.config}_train_val_metric.svg")
+    plt.savefig(f"img/conf_{hyperparameters.config}_train_val_metric.pdf", format='pdf', bbox_inches='tight')
 
 
 def plot_confusion_matrix(ground_truth, predictions, step, name):
@@ -320,7 +322,11 @@ def plot_confusion_matrix(ground_truth, predictions, step, name):
     # create the directory if it does not exist
     if not os.path.exists("img"):
         os.mkdir("img")
-    plt.savefig(f"img/conf_{hyperparameters.config}_{name}_confmatrix_step_{step}.svg")
+    plt.tight_layout()
+    if name == 'test': 
+        plt.savefig(f"img/conf_{hyperparameters.config}_{name}_confmatrix.pdf", format='pdf', bbox_inches='tight')
+    else:
+        plt.savefig(f"img/conf_{hyperparameters.config}_{name}_confmatrix_step_{step}.pdf", format='pdf', bbox_inches='tight')
     plt.close()
 
 
@@ -599,6 +605,8 @@ if not LOAD_MODEL:
                 valid_losses_batches = []
                 with torch.no_grad():
                     model.eval()
+                    all_targets = []
+                    all_predictions = []
                     for idx, (inputs, targets) in enumerate(val_dataloader):
                         # Add eventual noise to the inputs
                         if hyperparameters.noise_gaussian_std != 0:
@@ -613,12 +621,16 @@ if not LOAD_MODEL:
                         output = model(inputs)
 
                         loss = loss_fn(output, targets)
-                        if (PLOT_GRAPHS and idx == len(val_dataloader)-1):
-                            plot_confusion_matrix(targets.detach().cpu().numpy().flatten().tolist(), torch.argmax(output, dim=1).detach().cpu().numpy().flatten().tolist(), step=step, name = "val")
-                            plot_img_label_output(inputs, targets, step, output=output, name="val")
+                        if PLOT_GRAPHS:
+                            all_targets.extend(targets.detach().cpu().numpy().flatten().tolist())
+                            all_predictions.extend(torch.argmax(output, dim=1).detach().cpu().numpy().flatten().tolist())
+                            if idx == len(val_dataloader)-1:
+                                plot_img_label_output(inputs, targets, step, output=output, name="val")
                         # Multiply by len(x) because the final batch of DataLoader may be smaller (drop_last=False).
                         valid_accuracies_batches.append(IOU_accuracy(targets, output) * len(inputs))
                         valid_losses_batches.append(loss.item())
+                    if PLOT_GRAPHS:
+                        plot_confusion_matrix(all_targets, all_predictions, step=step, name="val")
                     model.train()
 
                 # Append average validation accuracy to list.
@@ -636,7 +648,7 @@ if not LOAD_MODEL:
 
     if SAVE_MODEL:
         print("Saving model")
-        torch.save(model, f"model_{hyperparameters.config}.pt")
+        torch.save(model, f"model_2.pt")
         print("Model saved")
 
 """
@@ -652,7 +664,7 @@ if TESTING:
     print("Testing model")
     if LOAD_MODEL:
         print("Loading model")
-        model = torch.load(f"model_{hyperparameters.config}.pt")
+        model = torch.load(f"model_2.pt")
         print("Model loaded")
     test_accuracies = []
     test_losses = []
@@ -682,7 +694,7 @@ if TESTING:
             loss = loss_fn(output, targets)
             test_accuracies.append(IOU_accuracy(targets, output))
             test_losses.append(loss.item())
-            if (PLOT_GRAPHS and idx == len(test_dataloader)-1):
+            if PLOT_GRAPHS:
                 all_targets.extend(targets.detach().cpu().numpy().flatten().tolist())
                 all_predictions.extend(torch.argmax(output, dim=1).detach().cpu().numpy().flatten().tolist())
                 if idx == len(test_dataloader)-1:

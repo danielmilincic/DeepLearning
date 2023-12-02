@@ -36,10 +36,10 @@ class Hyperparameters:
         self.val_freq = 10
         self.learning_rate = 1e-5
         self.noise_gaussian_std = 0.00
-        self.noise_salt_pepper_prob = 0.00
+        self.noise_salt_pepper_prob = 0.02
         self.noise_poisson_lambda = 0  # try values around 5 maybe
         self.seed = 20
-        self.config = 21
+        self.config = 31
 
     def display(self):
         print("Hyperparameters:")
@@ -65,10 +65,10 @@ In this section, we initialize and set all the control variables used in the scr
 GENERATION = False
 
 # for Scenario 2 set this to True, for Scenario 1 and Scenario 3 set this to False
-SCENARIO_2 = True
+SCENARIO_2 = False
 
 # set to true if you want to plot graphs
-PLOT_GRAPHS = False
+PLOT_GRAPHS = True
 
 # set to true to save the model
 SAVE_MODEL = False
@@ -77,7 +77,7 @@ SAVE_MODEL = False
 TESTING = True
 
 # set to true to load the model
-LOAD_MODEL = True
+LOAD_MODEL = False
 
 DTU_BLUE = '#2f3eea'
 ORNAGE = '#FFAE4A'
@@ -418,7 +418,7 @@ def add_salt_pepper_noise(image_in, salt_pepper_prob):
 
     # Reshape the image to its original shape
     image_in = flat_image.view(image_in.shape)
-    
+
     return image_in
 
 
@@ -426,10 +426,7 @@ def add_poisson_noise(image_in, lam):
     noise = np.random.poisson(lam, image_in.shape)
     image_in = image_in + noise
     image_in[image_in < 0] = 0
-    image_in[image_in > 255] = 255
-
-    # Convert image to float
-    image_in = image_in.float()
+    image_in[image_in > 1] = 1
 
     return image_in
 

@@ -36,10 +36,10 @@ class Hyperparameters:
         self.val_freq = 10
         self.learning_rate = 1e-5
         self.noise_gaussian_std = 0.00
-        self.noise_salt_pepper_prob = 0.02
+        self.noise_salt_pepper_prob = 0.00
         self.noise_poisson_lambda = 0  # try values around 5 maybe
         self.seed = 20
-        self.config = 31
+        self.config = 99
 
     def display(self):
         print("Hyperparameters:")
@@ -65,7 +65,7 @@ In this section, we initialize and set all the control variables used in the scr
 GENERATION = False
 
 # for Scenario 2 set this to True, for Scenario 1 and Scenario 3 set this to False
-SCENARIO_2 = False
+SCENARIO_2 = True
 
 # set to true if you want to plot graphs
 PLOT_GRAPHS = True
@@ -77,7 +77,7 @@ SAVE_MODEL = False
 TESTING = True
 
 # set to true to load the model
-LOAD_MODEL = False
+LOAD_MODEL = True
 
 DTU_BLUE = '#2f3eea'
 ORNAGE = '#FFAE4A'
@@ -262,7 +262,7 @@ def plot_img_label_output(org_image, ground_truth, step, name, output=None):
 
     if output is not None:
         output = torch.argmax(output[0], dim=0).detach().cpu().squeeze().numpy()
-        fig, axs = plt.subplots(1, 3)
+        fig, axs = plt.subplots(1, 4)
     else:
         fig, axs = plt.subplots(1, 2)
 
@@ -276,6 +276,12 @@ def plot_img_label_output(org_image, ground_truth, step, name, output=None):
         axs[2].imshow(output, cmap=coastal_breeze_cmap)
         axs[2].set_title("Prediction")
         axs[2].axis('off')
+        
+        difference = np.abs(ground_truth - output)
+        binary_difference = np.where(difference > 0, 1, 0)
+        axs[3].imshow(binary_difference, cmap='gray')
+        axs[3].set_title("Error Mask")
+        axs[3].axis('off')
     # create the directory if it does not exist
     if not os.path.exists("img"):
         os.mkdir("img")

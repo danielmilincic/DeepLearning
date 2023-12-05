@@ -13,6 +13,7 @@ import segmentation_models_pytorch as smp
 from sklearn.metrics import confusion_matrix
 import seaborn as sns
 import random
+from matplotlib.ticker import EngFormatter
 
 
 """
@@ -36,7 +37,7 @@ class Hyperparameters:
         self.val_freq = 10
         self.learning_rate = 1e-5
         self.noise_gaussian_std = 0.00
-        self.noise_salt_pepper_prob = 0.00
+        self.noise_salt_pepper_prob = 0
         self.noise_poisson_lambda = 0  # try values around 5 maybe
         self.seed = 20
         self.config = 99
@@ -49,12 +50,10 @@ class Hyperparameters:
               f"Salt and pepper noise probability: {self.noise_salt_pepper_prob}\n"
               f"Poisson noise lambda: {self.noise_poisson_lambda}\n")
 
-
 hyperparameters = Hyperparameters()
 
 """
 ======================== HYPERPARAMETERS - END ========================"""
-
 
 """
 ======================== CONTROL VARIABLES - START ========================
@@ -79,8 +78,14 @@ TESTING = True
 # set to true to load the model
 LOAD_MODEL = True
 
+# set to true to plot the accuracy vs. noise plot. Loads the model and testes the model against different noises.
+PLOT_NOISE_ACCURACY = True
+if PLOT_NOISE_ACCURACY:
+    LOAD_MODEL = True
+    SCENARIO_2 = True
+
 DTU_BLUE = '#2f3eea'
-ORNAGE = '#FFAE4A'
+ORANGE = '#FFAE4A'
 
 """
 ======================== CONTROL VARIABLES - END ========================"""
@@ -294,18 +299,18 @@ def plot_train_val_loss_and_accuracy(train_loss, val_loss, train_acc, val_acc, s
 
     plt.figure(figsize=(12, 5))
     plt.subplot(1, 2, 1)
-    plt.plot(steps, train_acc, color=DTU_BLUE, label=' Training')
-    plt.plot(steps, val_acc, color=ORNAGE, label='Validation')
-    plt.title('IOU Accuracy', fontsize='large')
+    plt.plot(steps, train_acc, color=DTU_BLUE, label=' Training', linewidth=3)
+    plt.plot(steps, val_acc, color=ORANGE, label='Validation', linewidth=3)
+    plt.title('IOU Accuracy', fontsize='x-large')
     plt.xlabel('Step', fontsize='large')
     # plt.ylabel('IOU Accuracy', fontsize='large')
     plt.ylim([0,1])
     plt.legend(fontsize='large')  
 
     plt.subplot(1, 2, 2)
-    plt.plot(steps, train_loss, color=DTU_BLUE, linestyle='-',  label='Training')
-    plt.plot(steps, val_loss, color=ORNAGE, label='Validation')
-    plt.title('DICE Loss', fontsize='large')
+    plt.plot(steps, train_loss, color=DTU_BLUE, linestyle='-',  label='Training', linewidth=3)
+    plt.plot(steps, val_loss, color=ORANGE, label='Validation', linewidth=3)
+    plt.title('DICE Loss', fontsize='x-large')
     plt.xlabel('Step', fontsize='large')
     # plt.ylabel('DICE Loss', fontsize='large')
     plt.legend(fontsize='large')  
@@ -321,10 +326,10 @@ def plot_confusion_matrix(ground_truth, predictions, step, name):
     cm = confusion_matrix(ground_truth, predictions, labels=[0, 1, 2], normalize="true")
     class_labels = ["C0", "C1", "C2"]
     plt.figure(figsize=(10, 7))
-    sns.heatmap(cm, annot=True, cmap='Blues', xticklabels=class_labels, yticklabels=class_labels)
-    plt.xlabel('Prediction', fontsize = 'large')
-    plt.ylabel('Label', fontsize = 'large')
-    plt.title("Confusion Matrix", fontsize = 'large')
+    sns.heatmap(cm, annot=True, cmap='Blues', xticklabels=class_labels, yticklabels=class_labels,  annot_kws={"size": 16})
+    plt.xlabel('Prediction', fontsize = 'x-large')
+    plt.ylabel('Label', fontsize = 'x-large')
+    plt.title("Confusion Matrix", fontsize = 'x-large')
     # create the directory if it does not exist
     if not os.path.exists("img"):
         os.mkdir("img")
@@ -659,8 +664,7 @@ if not LOAD_MODEL:
 ======================== TESTING  - START ========================
 In this section, we test the model."""
 
-
-if TESTING:
+if TESTING and not PLOT_NOISE_ACCURACY:
     print("Testing model")
     if LOAD_MODEL:
         print("Loading model")
@@ -705,8 +709,40 @@ if TESTING:
             plot_confusion_matrix(all_targets, all_predictions, step=0, name="test")     
         print(f"Test accuracy: {np.mean(test_accuracies)}")
         print(f"Test loss: {np.mean(test_losses)}")
-
 """
 ======================== TESTING  - END ========================"""
+def plot_accuracy_against_noise(title, x_label, noise_values, noise_type):
+    accuracies = []
+    model = torch.load("model_2.pt")
 
+    for noise in noise_values:
+        test_accuracies = []
+        with torch.no_grad():
+            model.eval()
+            for inputs, targets in test_dataloader:
+                inputs = add_noise(inputs, noise, noise_type)
+                inputs, targets = inputs.to(device), map_target_to_class(targets.to(device))
+                output = model(inputs)
+                test_accuracies.append(IOU_accuracy(targets, output))
+        accuracies.append(np.mean(test_accuracies))
 
+    plot_graph(noise_values, accuracies, title, x_label)
+
+def add_noise(inputs, noise, noise_type):
+    if noise_type == "gaussian":
+        return add_gaussian_noise(inputs, noise)
+    elif noise_type == "salt_and_pepper":
+        return add_salt_pepper_noise(inputs, noise)
+
+def plot_graph(x_values, y_values, title, x_label):
+    plt.plot(x_values, y_values, color = DTU_BLUE)
+    plt.ticklabel_format(style='sci', axis='x', scilimits=(0,0))
+    plt.title(title, fontsize='x-large')
+    plt.xlabel(x_label, fontsize='large')
+    plt.ylabel('Accuracy', fontsize='large')
+    plt.savefig(f"Noise_Accuracy_Plot_{title}.png", dpi = 400)
+    plt.close()
+
+if PLOT_NOISE_ACCURACY:
+    plot_accuracy_against_noise("Gaussian Noise", "Standard Deviation", np.linspace(0, 0.25, 25), "gaussian")
+    plot_accuracy_against_noise("Salt and Pepper Noise", "Frequency", np.linspace(0, 0.025, 25), "salt_and_pepper")

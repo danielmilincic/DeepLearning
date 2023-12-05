@@ -64,7 +64,7 @@ In this section, we initialize and set all the control variables used in the scr
 GENERATION = False
 
 # for Scenario 2 set this to True, for Scenario 1 and Scenario 3 set this to False
-SCENARIO_2 = True
+SCENARIO_2 = False
 
 # set to true if you want to plot graphs
 PLOT_GRAPHS = True
@@ -76,10 +76,10 @@ SAVE_MODEL = False
 TESTING = True
 
 # set to true to load the model
-LOAD_MODEL = True
+LOAD_MODEL = False
 
 # set to true to plot the accuracy vs. noise plot. Loads the model and testes the model against different noises.
-PLOT_NOISE_ACCURACY = True
+PLOT_NOISE_ACCURACY = False
 if PLOT_NOISE_ACCURACY:
     LOAD_MODEL = True
     SCENARIO_2 = True
@@ -299,8 +299,8 @@ def plot_train_val_loss_and_accuracy(train_loss, val_loss, train_acc, val_acc, s
 
     plt.figure(figsize=(12, 5))
     plt.subplot(1, 2, 1)
-    plt.plot(steps, train_acc, color=DTU_BLUE, label=' Training', linewidth=3)
-    plt.plot(steps, val_acc, color=ORANGE, label='Validation', linewidth=3)
+    plt.plot(steps, train_acc, color=DTU_BLUE, label=' Training', linewidth=2)
+    plt.plot(steps, val_acc, color=ORANGE, label='Validation', linewidth=2)
     plt.title('IOU Accuracy', fontsize='x-large')
     plt.xlabel('Step', fontsize='large')
     # plt.ylabel('IOU Accuracy', fontsize='large')
@@ -308,8 +308,8 @@ def plot_train_val_loss_and_accuracy(train_loss, val_loss, train_acc, val_acc, s
     plt.legend(fontsize='large')  
 
     plt.subplot(1, 2, 2)
-    plt.plot(steps, train_loss, color=DTU_BLUE, linestyle='-',  label='Training', linewidth=3)
-    plt.plot(steps, val_loss, color=ORANGE, label='Validation', linewidth=3)
+    plt.plot(steps, train_loss, color=DTU_BLUE, linestyle='-',  label='Training', linewidth=2)
+    plt.plot(steps, val_loss, color=ORANGE, label='Validation', linewidth=2)
     plt.title('DICE Loss', fontsize='x-large')
     plt.xlabel('Step', fontsize='large')
     # plt.ylabel('DICE Loss', fontsize='large')
@@ -735,7 +735,7 @@ def add_noise(inputs, noise, noise_type):
         return add_salt_pepper_noise(inputs, noise)
 
 def plot_graph(x_values, y_values, title, x_label):
-    plt.plot(x_values, y_values, color = DTU_BLUE)
+    plt.plot(x_values, y_values, color = DTU_BLUE, linewidth=2)
     plt.ticklabel_format(style='sci', axis='x', scilimits=(0,0))
     plt.title(title, fontsize='x-large')
     plt.xlabel(x_label, fontsize='large')

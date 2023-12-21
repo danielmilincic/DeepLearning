@@ -6,6 +6,7 @@ from torch.utils.data import Dataset, random_split, DataLoader
 from PIL import Image, ImageOps
 import matplotlib.pyplot as plt
 from UNet_3Plus import UNet_3Plus
+import torch
 import torch.nn.functional as F
 import time
 import segmentation_models_pytorch as smp
@@ -14,6 +15,12 @@ import seaborn as sns
 import random
 from matplotlib.ticker import EngFormatter
 
+"""
+PRELIMINARY NOTES:
+Scenario 1: training without noise and testing without noise 
+Scenario 2: training without noise and testing with noise
+Scenario 3: training with noise and testing with noise
+"""
 
 """
 ======================== HYPERPARAMETERS - START ========================
@@ -25,22 +32,20 @@ class Hyperparameters:
         """
         # HOW TO SET THE NOISE PARAMETERS:
         #
-        # - for Scenario 1 (no noise): set all the 3 noise parameters to 0 and SCENARIO_2 = False
-        # - for Scenario 2 (noise only on Test inputs): set the single noise parameter to 
-        #   the desired value and set SCENARIO_2 = True
-        # - for Scenario 3 (noise on Train,Val,Test inputs): set the single noise parameter to 
-        #   the desired value and set SCENARIO_2 = False
+        # - for Scenario 1: set all the 3 noise parameters to 0 and SCENARIO_2 = False
+        # - for Scenario 2: set the single noise parameter to the desired value and set SCENARIO_2 = True
+        # - for Scenario 3: set the single noise parameter to the desired value and set SCENARIO_2 = False
         """
 
         self.batch_size = 8
         self.num_epochs = 1
-        self.val_freq = 10
+        self.val_freq = 100
         self.learning_rate = 1e-5
         self.noise_gaussian_std = 0.00
         self.noise_salt_pepper_prob = 0
-        self.noise_poisson_lambda = 0  # try values around 5 maybe
+        self.noise_poisson_lambda = 0  
         self.seed = 20
-        self.config = 99
+        self.config = 7
 
     def display(self):
         print("Hyperparameters:")
@@ -59,10 +64,6 @@ hyperparameters = Hyperparameters()
 """
 ======================== CONTROL VARIABLES - START ========================
 In this section, we initialize and set all the control variables used in the script.
-
-Scenario 1: training without noise and testing without noise 
-Scenario 2: training without noise and testing with noise
-Scenario 3: training with noise and testing with noise
 """
 
 
@@ -73,22 +74,22 @@ GENERATION = False
 SCENARIO_2 = False
 
 # set to True to plot graphs
-PLOT_GRAPHS = True
+PLOT_GRAPHS = False
 
 # set to True to save the trained model
 SAVE_MODEL = False
 
 # set the name of the model you want to save
-MODEL_TO_BE_SAVED = "model2"
+MODEL_TO_BE_SAVED = "model_7"
 
 # set to True to test the model on the test set
-TESTING = True
+TESTING = False
 
-# set to True to load the saved model
+# set to True to load a previously saved model
 LOAD_MODEL = False
 
 # set the name of the model you want to load
-MODEL_TO_BE_LOADED = "model2"
+MODEL_TO_BE_LOADED = "model_7"
 
 # set to True to plot the accuracy over noise plots.
 PLOT_NOISE_ACCURACY = False

@@ -7,7 +7,6 @@ from PIL import Image, ImageOps
 import matplotlib.pyplot as plt
 from UNet_3Plus import UNet_3Plus
 import torch.nn.functional as F
-from dice_loss import *
 import time
 import segmentation_models_pytorch as smp
 from sklearn.metrics import confusion_matrix
@@ -18,7 +17,8 @@ from matplotlib.ticker import EngFormatter
 
 """
 ======================== HYPERPARAMETERS - START ========================
-In this section, we initialize and set all the hyperparameters used in the script."""
+In this section, we initialize and set all the hyperparameters used in the script.
+"""
 
 class Hyperparameters:
     def __init__(self):
@@ -53,37 +53,47 @@ class Hyperparameters:
 hyperparameters = Hyperparameters()
 
 """
-======================== HYPERPARAMETERS - END ========================"""
+======================== HYPERPARAMETERS - END ========================
+"""
 
 """
 ======================== CONTROL VARIABLES - START ========================
-In this section, we initialize and set all the control variables used in the script."""
+In this section, we initialize and set all the control variables used in the script.
+
+Scenario 1: training without noise and testing without noise 
+Scenario 2: training without noise and testing with noise
+Scenario 3: training with noise and testing with noise
+"""
 
 
-# DO NOT CHANGE THIS TO TRUE UNLESS YOU WANT TO GENERATE NEW DATASET FROM SCRATCH
+# set to True if you want to generate the augmented dataset
 GENERATION = False
 
 # for Scenario 2 set this to True, for Scenario 1 and Scenario 3 set this to False
 SCENARIO_2 = False
 
-# set to true if you want to plot graphs
+# set to True to plot graphs
 PLOT_GRAPHS = True
 
-# set to true to save the model
+# set to True to save the trained model
 SAVE_MODEL = False
 
-# set this to True if you want to test the model on the test set at the end of the training
+# set the name of the model you want to save
+MODEL_TO_BE_SAVED = "model2"
+
+# set to True to test the model on the test set
 TESTING = True
 
-# set to true to load the model
+# set to True to load the saved model
 LOAD_MODEL = False
 
-# set to true to plot the accuracy vs. noise plot. Loads the model and testes the model against different noises.
-PLOT_NOISE_ACCURACY = False
-if PLOT_NOISE_ACCURACY:
-    LOAD_MODEL = True
-    SCENARIO_2 = True
+# set the name of the model you want to load
+MODEL_TO_BE_LOADED = "model2"
 
+# set to True to plot the accuracy over noise plots.
+PLOT_NOISE_ACCURACY = False
+
+# colour palette
 DTU_BLUE = '#2f3eea'
 ORANGE = '#FFAE4A'
 
@@ -441,6 +451,39 @@ def add_poisson_noise(image_in, lam):
 
     return image_in
 
+
+def plot_accuracy_against_noise(title, x_label, noise_values, noise_type):
+    accuracies = []
+    model = torch.load(f"{MODEL_TO_BE_LOADED}.pt")
+
+    for noise in noise_values:
+        test_accuracies = []
+        with torch.no_grad():
+            model.eval()
+            for inputs, targets in test_dataloader:
+                inputs = add_noise(inputs, noise, noise_type)
+                inputs, targets = inputs.to(device), map_target_to_class(targets.to(device))
+                output = model(inputs)
+                test_accuracies.append(IOU_accuracy(targets, output))
+        accuracies.append(np.mean(test_accuracies))
+
+    plot_graph(noise_values, accuracies, title, x_label)
+
+def add_noise(inputs, noise, noise_type):
+    if noise_type == "gaussian":
+        return add_gaussian_noise(inputs, noise)
+    elif noise_type == "salt_and_pepper":
+        return add_salt_pepper_noise(inputs, noise)
+
+def plot_graph(x_values, y_values, title, x_label):
+    plt.plot(x_values, y_values, color = DTU_BLUE, linewidth=2)
+    plt.ticklabel_format(style='sci', axis='x', scilimits=(0,0))
+    plt.title(title, fontsize='x-large')
+    plt.xlabel(x_label, fontsize='large')
+    plt.ylabel('Accuracy', fontsize='large')
+    plt.savefig(f"Noise_Accuracy_Plot_{title}.png", dpi = 400)
+    plt.close()
+
 """
 ======================== HELPER FUNCTIONS - END ========================"""
 
@@ -525,14 +568,10 @@ if SCENARIO_2:
     hyperparameters.noise_salt_pepper_prob = 0.00
     hyperparameters.noise_poisson_lambda = 0.00
 
-# Plot histograms
-# if(PLOT_GRAPHS):
-    # plot_hist(train_dataset, name="Train Data")
-    # plot_hist(val_dataset, name="Validation Data")
-    # if TESTING:
-        # plot_hist(test_dataset, name="Test Data")
+if PLOT_NOISE_ACCURACY:
+    LOAD_MODEL = True
+    SCENARIO_2 = True
 
-# put here because needed for testing
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 loss_fn = smp.losses.DiceLoss(mode="multiclass", from_logits=True, smooth=1.0)
 
@@ -554,7 +593,6 @@ if not LOAD_MODEL:
 
     step = 0
     model.train()
-
     train_accuracies = []
     valid_accuracies = []
     train_losses = []
@@ -653,7 +691,7 @@ if not LOAD_MODEL:
 
     if SAVE_MODEL:
         print("Saving model")
-        torch.save(model, f"model_2.pt")
+        torch.save(model, f"{MODEL_TO_BE_SAVED}.pt")
         print("Model saved")
 
 """
@@ -668,7 +706,7 @@ if TESTING and not PLOT_NOISE_ACCURACY:
     print("Testing model")
     if LOAD_MODEL:
         print("Loading model")
-        model = torch.load(f"model_2.pt")
+        model = torch.load(f"{MODEL_TO_BE_LOADED}.pt")
         print("Model loaded")
     test_accuracies = []
     test_losses = []
@@ -711,38 +749,15 @@ if TESTING and not PLOT_NOISE_ACCURACY:
         print(f"Test loss: {np.mean(test_losses)}")
 """
 ======================== TESTING  - END ========================"""
-def plot_accuracy_against_noise(title, x_label, noise_values, noise_type):
-    accuracies = []
-    model = torch.load("model_2.pt")
 
-    for noise in noise_values:
-        test_accuracies = []
-        with torch.no_grad():
-            model.eval()
-            for inputs, targets in test_dataloader:
-                inputs = add_noise(inputs, noise, noise_type)
-                inputs, targets = inputs.to(device), map_target_to_class(targets.to(device))
-                output = model(inputs)
-                test_accuracies.append(IOU_accuracy(targets, output))
-        accuracies.append(np.mean(test_accuracies))
-
-    plot_graph(noise_values, accuracies, title, x_label)
-
-def add_noise(inputs, noise, noise_type):
-    if noise_type == "gaussian":
-        return add_gaussian_noise(inputs, noise)
-    elif noise_type == "salt_and_pepper":
-        return add_salt_pepper_noise(inputs, noise)
-
-def plot_graph(x_values, y_values, title, x_label):
-    plt.plot(x_values, y_values, color = DTU_BLUE, linewidth=2)
-    plt.ticklabel_format(style='sci', axis='x', scilimits=(0,0))
-    plt.title(title, fontsize='x-large')
-    plt.xlabel(x_label, fontsize='large')
-    plt.ylabel('Accuracy', fontsize='large')
-    plt.savefig(f"Noise_Accuracy_Plot_{title}.png", dpi = 400)
-    plt.close()
+"""
+======================== CREATE NOISE PLOTS - START ========================
+In this section, we create the noise plots."""
 
 if PLOT_NOISE_ACCURACY:
     plot_accuracy_against_noise("Gaussian Noise", "Standard Deviation", np.linspace(0, 0.25, 25), "gaussian")
     plot_accuracy_against_noise("Salt and Pepper Noise", "Frequency", np.linspace(0, 0.025, 25), "salt_and_pepper")
+
+"""
+======================== CREATE NOISE PLOTS - END ========================
+"""

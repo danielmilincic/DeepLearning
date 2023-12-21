@@ -5,10 +5,13 @@ import matplotlib.pyplot as plt
 from PIL import Image
 import numpy as np
 
-
+"""
+Before running this script, make sure to create the augmented dataset
+by running src/XRaysAugmentation.py with GENERATION = True. 
+"""
 def create_combined_histogram(data_folder, name, titel):
     """
-    Creates a histogram over all pixel of all images in the data_folder
+    Creates a histogram over all pixel values in the given folder.
     """
     all_pixels = []
 
